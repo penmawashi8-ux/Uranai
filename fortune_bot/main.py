@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+import traceback
 from datetime import datetime, timezone, timedelta
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -171,6 +172,7 @@ def main() -> None:
             youtube = build_youtube_client()
         except Exception as e:
             print(f"❌ YouTube 認証失敗: {e}")
+            traceback.print_exc()
             print("💡 先に python upload_youtube.py --auth を実行してください")
             sys.exit(1)
 

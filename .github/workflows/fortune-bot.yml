@@ -35,26 +35,35 @@ jobs:
         run: pip install -r fortune_bot/requirements.txt
 
       - name: .env を作成
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
         run: |
-          cat > fortune_bot/.env << 'ENVEOF'
-          GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
-          YOUTUBE_CLIENT_ID=${{ secrets.YOUTUBE_CLIENT_ID }}
-          YOUTUBE_CLIENT_SECRET=${{ secrets.YOUTUBE_CLIENT_SECRET }}
-          CHANNEL_NAME=占い動画チャンネル
-          ENVEOF
+          printf 'GEMINI_API_KEY=%s\nYOUTUBE_CLIENT_ID=%s\nYOUTUBE_CLIENT_SECRET=%s\nCHANNEL_NAME=占い動画チャンネル\n' \
+            "$GEMINI_API_KEY" "$YOUTUBE_CLIENT_ID" "$YOUTUBE_CLIENT_SECRET" \
+            > fortune_bot/.env
 
       - name: token.json を作成
+        env:
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
         run: |
-          cat > fortune_bot/token.json << 'TOKENEOF'
-          {
-            "token": "",
-            "refresh_token": "${{ secrets.YOUTUBE_REFRESH_TOKEN }}",
-            "token_uri": "https://oauth2.googleapis.com/token",
-            "client_id": "${{ secrets.YOUTUBE_CLIENT_ID }}",
-            "client_secret": "${{ secrets.YOUTUBE_CLIENT_SECRET }}",
-            "scopes": ["https://www.googleapis.com/auth/youtube.upload"]
+          python3 - <<'PYEOF'
+          import json, os
+          data = {
+              "token": "",
+              "refresh_token": os.environ["YOUTUBE_REFRESH_TOKEN"].strip(),
+              "token_uri": "https://oauth2.googleapis.com/token",
+              "client_id": os.environ["YOUTUBE_CLIENT_ID"].strip(),
+              "client_secret": os.environ["YOUTUBE_CLIENT_SECRET"].strip(),
+              "scopes": ["https://www.googleapis.com/auth/youtube.upload"],
           }
-          TOKENEOF
+          with open("fortune_bot/token.json", "w") as f:
+              json.dump(data, f)
+          print("token.json 作成完了")
+          PYEOF
 
       - name: セットアップ（フォント・背景画像生成）
         run: cd fortune_bot && python setup.py
@@ -81,3 +90,14 @@ jobs:
           SIGN="${{ github.event.inputs.sign }}"
           SIGN="${SIGN:-おひつじ座}"
           cd fortune_bot && python main.py --sign "$SIGN"
+
+      - name: エラーログをアーティファクトに保存
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: error-logs-${{ github.run_id }}
+          path: |
+            fortune_bot/logs/
+            fortune_bot/output/
+          retention-days: 7
+          if-no-files-found: ignore
