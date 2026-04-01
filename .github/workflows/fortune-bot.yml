@@ -110,6 +110,7 @@ jobs:
           RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           STATUS="${{ job.status }}"
           DATE=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M JST')
+          JSON=$(ls fortune_bot/output/fortune_*.json 2>/dev/null | head -1)
 
           {
             echo "## ${DATE} — ${STATUS}"
@@ -117,19 +118,18 @@ jobs:
             echo "[▶ Actionsログを見る](${RUN_URL})"
             echo ""
 
-            JSON=$(ls fortune_bot/output/fortune_*.json 2>/dev/null | head -1)
             if [ -n "$JSON" ]; then
               echo "### 運勢生成結果"
               echo '```'
-              python3 -c "
-import json
-data = json.load(open('$JSON'))
-fallbacks = sum(1 for f in data if f.get('hook') == '今日も運気上昇中')
-print(f'API成功: {len(data)-fallbacks}/12  フォールバック: {fallbacks}/12')
-for f in data:
-    mark = '⚠️' if f.get('hook') == '今日も運気上昇中' else '✅'
-    print(f\"{mark} {f['sign']}: {f['hook']}\")
-" 2>/dev/null || echo "(JSON解析失敗)"
+              FORTUNE_JSON="$JSON" python3 - <<'PYEOF'
+          import json, os
+          data = json.load(open(os.environ['FORTUNE_JSON']))
+          fallbacks = sum(1 for f in data if f.get('hook') == '今日も運気上昇中')
+          print(f'API成功: {len(data)-fallbacks}/12  フォールバック: {fallbacks}/12')
+          for f in data:
+              mark = '⚠️' if f.get('hook') == '今日も運気上昇中' else '✅'
+              print(f"{mark} {f['sign']}: {f['hook']}")
+          PYEOF
               echo '```'
               echo ""
             fi
