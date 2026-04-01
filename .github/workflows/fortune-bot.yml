@@ -104,37 +104,26 @@ jobs:
 
       - name: 実行結果をIssueにコメント
         if: always()
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           STATUS="${{ job.status }}"
           DATE=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M JST')
-          TMPFILE=$(mktemp)
 
-          echo "## ${DATE} — ${STATUS}" >> "$TMPFILE"
-          echo "" >> "$TMPFILE"
-          echo "[▶ Actionsログを見る](${RUN_URL})" >> "$TMPFILE"
-          echo "" >> "$TMPFILE"
+          BODY="## ${DATE} — ${STATUS}\n\n[▶ Actionsログを見る](${RUN_URL})\n\n"
 
           JSON=$(ls fortune_bot/output/fortune_*.json 2>/dev/null | head -1)
           if [ -n "$JSON" ]; then
-            echo "### 運勢生成結果" >> "$TMPFILE"
-            echo '```' >> "$TMPFILE"
-            python3 -c "import json,sys; data=json.load(open(sys.argv[1])); fb=sum(1 for f in data if f.get('hook')=='今日も運気上昇中'); print(f'API成功: {len(data)-fb}/12  フォールバック: {fb}/12'); [print(('⚠️' if f.get('hook')=='今日も運気上昇中' else '✅')+' '+f['sign']+': '+f['hook']) for f in data]" \
-              "$JSON" >> "$TMPFILE" 2>/dev/null || echo "(JSON解析失敗)" >> "$TMPFILE"
-            echo '```' >> "$TMPFILE"
-            echo "" >> "$TMPFILE"
+            SUMMARY=$(python3 -c "import json,sys; data=json.load(open(sys.argv[1])); fb=sum(1 for f in data if f.get('hook')=='今日も運気上昇中'); print(f'API成功: {len(data)-fb}/12  フォールバック: {fb}/12'); [print(('⚠️' if f.get('hook')=='今日も運気上昇中' else '✅')+' '+f['sign']+': '+f['hook']) for f in data]" "$JSON" 2>/dev/null || echo '(JSON解析失敗)')
+            BODY="${BODY}### 運勢生成結果\n\`\`\`\n${SUMMARY}\n\`\`\`\n\n"
           fi
 
           if ls fortune_bot/logs/*.log 2>/dev/null | head -1 > /dev/null 2>&1; then
-            echo "### ログ" >> "$TMPFILE"
-            echo '```' >> "$TMPFILE"
-            cat fortune_bot/logs/*.log >> "$TMPFILE" 2>/dev/null
-            echo '```' >> "$TMPFILE"
+            LOGS=$(cat fortune_bot/logs/*.log 2>/dev/null)
+            BODY="${BODY}### ログ\n\`\`\`\n${LOGS}\n\`\`\`\n"
           fi
 
-          gh issue comment 5 \
-            --repo "${{ github.repository }}" \
-            --body-file "$TMPFILE"
-          rm -f "$TMPFILE"
+          curl -s -X POST \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            "https://api.github.com/repos/${{ github.repository }}/issues/5/comments" \
+            -d "{\"body\": $(echo -e "$BODY" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')}"
