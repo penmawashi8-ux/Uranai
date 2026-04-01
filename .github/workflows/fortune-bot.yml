@@ -110,36 +110,31 @@ jobs:
           RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           STATUS="${{ job.status }}"
           DATE=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M JST')
+          TMPFILE=$(mktemp)
+
+          echo "## ${DATE} — ${STATUS}" >> "$TMPFILE"
+          echo "" >> "$TMPFILE"
+          echo "[▶ Actionsログを見る](${RUN_URL})" >> "$TMPFILE"
+          echo "" >> "$TMPFILE"
+
           JSON=$(ls fortune_bot/output/fortune_*.json 2>/dev/null | head -1)
+          if [ -n "$JSON" ]; then
+            echo "### 運勢生成結果" >> "$TMPFILE"
+            echo '```' >> "$TMPFILE"
+            python3 -c "import json,sys; data=json.load(open(sys.argv[1])); fb=sum(1 for f in data if f.get('hook')=='今日も運気上昇中'); print(f'API成功: {len(data)-fb}/12  フォールバック: {fb}/12'); [print(('⚠️' if f.get('hook')=='今日も運気上昇中' else '✅')+' '+f['sign']+': '+f['hook']) for f in data]" \
+              "$JSON" >> "$TMPFILE" 2>/dev/null || echo "(JSON解析失敗)" >> "$TMPFILE"
+            echo '```' >> "$TMPFILE"
+            echo "" >> "$TMPFILE"
+          fi
 
-          {
-            echo "## ${DATE} — ${STATUS}"
-            echo ""
-            echo "[▶ Actionsログを見る](${RUN_URL})"
-            echo ""
+          if ls fortune_bot/logs/*.log 2>/dev/null | head -1 > /dev/null 2>&1; then
+            echo "### ログ" >> "$TMPFILE"
+            echo '```' >> "$TMPFILE"
+            cat fortune_bot/logs/*.log >> "$TMPFILE" 2>/dev/null
+            echo '```' >> "$TMPFILE"
+          fi
 
-            if [ -n "$JSON" ]; then
-              echo "### 運勢生成結果"
-              echo '```'
-              FORTUNE_JSON="$JSON" python3 - <<'PYEOF'
-          import json, os
-          data = json.load(open(os.environ['FORTUNE_JSON']))
-          fallbacks = sum(1 for f in data if f.get('hook') == '今日も運気上昇中')
-          print(f'API成功: {len(data)-fallbacks}/12  フォールバック: {fallbacks}/12')
-          for f in data:
-              mark = '⚠️' if f.get('hook') == '今日も運気上昇中' else '✅'
-              print(f"{mark} {f['sign']}: {f['hook']}")
-          PYEOF
-              echo '```'
-              echo ""
-            fi
-
-            if ls fortune_bot/logs/*.log 2>/dev/null | head -1 > /dev/null; then
-              echo "### ログ"
-              echo '```'
-              cat fortune_bot/logs/*.log 2>/dev/null
-              echo '```'
-            fi
-          } | gh issue comment 5 \
-              --repo "${{ github.repository }}" \
-              --body-file -
+          gh issue comment 5 \
+            --repo "${{ github.repository }}" \
+            --body-file "$TMPFILE"
+          rm -f "$TMPFILE"

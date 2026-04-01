@@ -1,4 +1,4 @@
-google-genai
+google-genai>=1.0.0
 moviepy
 google-api-python-client
 google-auth-oauthlib
