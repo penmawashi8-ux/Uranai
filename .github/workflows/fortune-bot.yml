@@ -101,3 +101,45 @@ jobs:
             fortune_bot/output/fortune_*.json
           retention-days: 7
           if-no-files-found: ignore
+
+      - name: 実行結果をIssueにコメント
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          STATUS="${{ job.status }}"
+          DATE=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M JST')
+
+          {
+            echo "## ${DATE} — ${STATUS}"
+            echo ""
+            echo "[▶ Actionsログを見る](${RUN_URL})"
+            echo ""
+
+            JSON=$(ls fortune_bot/output/fortune_*.json 2>/dev/null | head -1)
+            if [ -n "$JSON" ]; then
+              echo "### 運勢生成結果"
+              echo '```'
+              python3 -c "
+import json
+data = json.load(open('$JSON'))
+fallbacks = sum(1 for f in data if f.get('hook') == '今日も運気上昇中')
+print(f'API成功: {len(data)-fallbacks}/12  フォールバック: {fallbacks}/12')
+for f in data:
+    mark = '⚠️' if f.get('hook') == '今日も運気上昇中' else '✅'
+    print(f\"{mark} {f['sign']}: {f['hook']}\")
+" 2>/dev/null || echo "(JSON解析失敗)"
+              echo '```'
+              echo ""
+            fi
+
+            if ls fortune_bot/logs/*.log 2>/dev/null | head -1 > /dev/null; then
+              echo "### ログ"
+              echo '```'
+              cat fortune_bot/logs/*.log 2>/dev/null
+              echo '```'
+            fi
+          } | gh issue comment 5 \
+              --repo "${{ github.repository }}" \
+              --body-file -
