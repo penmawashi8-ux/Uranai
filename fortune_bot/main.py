@@ -101,6 +101,7 @@ def process_sign(
         video_path = generate_video(fortune, zodiac["slug"], date)
     except Exception as e:
         print(f"❌ {sign_name}: 動画生成失敗: {e}")
+        traceback.print_exc()
         return False
 
     if test_mode:
@@ -112,6 +113,7 @@ def process_sign(
         upload_video(youtube, video_path, fortune, date)
     except Exception as e:
         print(f"❌ {sign_name}: アップロード失敗: {e}")
+        traceback.print_exc()
         return False
 
     return True
