@@ -29,7 +29,7 @@ load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 # 定数
 # ---------------------------------------------------------------------------
 
-MODEL_NAME   = "gemini-1.5-flash"
+MODEL_NAME   = "gemini-2.0-flash"
 MAX_RETRIES  = 3
 RETRY_WAIT   = 10  # リトライ間隔（秒）
 
