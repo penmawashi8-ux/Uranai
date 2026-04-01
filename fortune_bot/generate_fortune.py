@@ -179,7 +179,9 @@ def generate_fortune_for_sign(
                 time.sleep(RETRY_WAIT)
 
     print(f"  ❌  [{zodiac['name']}] すべてのリトライが失敗。フォールバックを使用します")
-    return _make_fallback(zodiac, date)
+    fb = _make_fallback(zodiac, date)
+    fb["_fallback"] = True
+    return fb
 
 
 # ---------------------------------------------------------------------------
@@ -207,9 +209,12 @@ def generate_all_fortunes(date: str) -> list[dict]:
     fortunes: list[dict] = []
 
     print(f"🔮 {date} の占いテキストを生成中...")
+    fallback_count = 0
     for i, zodiac in enumerate(ZODIAC_LIST):
         print(f"  [{i + 1:02d}/12] {zodiac['name']} ...", end=" ", flush=True)
         fortune = generate_fortune_for_sign(client, zodiac, date)
+        if fortune.pop("_fallback", False):
+            fallback_count += 1
         fortunes.append(fortune)
         print(f"完了（hook: {fortune['hook'][:15]}）")
 
@@ -223,7 +228,17 @@ def generate_all_fortunes(date: str) -> list[dict]:
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(fortunes, f, ensure_ascii=False, indent=2)
 
-    print(f"\n✅ 保存完了: {output_path}")
+    # サマリー
+    success_count = len(ZODIAC_LIST) - fallback_count
+    print(f"\n{'=' * 40}")
+    print(f"✅ API成功: {success_count}/12  ⚠️ フォールバック: {fallback_count}/12")
+    print(f"保存完了: {output_path}")
+    print(f"{'=' * 40}")
+
+    if fallback_count == len(ZODIAC_LIST):
+        print("❌ 全星座がAPIエラーのためフォールバックを使用しました。GEMINI_API_KEYとモデル名を確認してください。")
+        sys.exit(1)
+
     return fortunes
 
 
