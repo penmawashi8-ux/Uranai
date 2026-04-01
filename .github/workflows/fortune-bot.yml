@@ -91,13 +91,13 @@ jobs:
           SIGN="${SIGN:-おひつじ座}"
           cd fortune_bot && python main.py --sign "$SIGN"
 
-      - name: エラーログをアーティファクトに保存
-        if: failure()
+      - name: ログをアーティファクトに保存
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: error-logs-${{ github.run_id }}
+          name: run-logs-${{ github.run_id }}
           path: |
             fortune_bot/logs/
-            fortune_bot/output/
+            fortune_bot/output/fortune_*.json
           retention-days: 7
           if-no-files-found: ignore
