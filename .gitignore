@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# 生成物（動画・運勢JSON）
+fortune_bot/output/
+
+# 認証トークン
+fortune_bot/token.json
+
+# アセット（setup.pyが自動生成）
+fortune_bot/assets/backgrounds/
+fortune_bot/assets/fonts/
+
+# BGM（著作権フリー素材は各自で配置）
+fortune_bot/assets/bgm/*.mp3
+fortune_bot/assets/bgm/*.wav
+
+# BGMフォルダのREADMEは追跡する
+!fortune_bot/assets/bgm/README.txt
