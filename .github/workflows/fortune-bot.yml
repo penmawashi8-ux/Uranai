@@ -104,26 +104,53 @@ jobs:
 
       - name: 実行結果をIssueにコメント
         if: always()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_ID: ${{ github.run_id }}
+          JOB_STATUS: ${{ job.status }}
+          REPO: ${{ github.repository }}
         run: |
-          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          STATUS="${{ job.status }}"
-          DATE=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M JST')
+          python3 - <<'PYEOF'
+          import json, os, glob, urllib.request
+          from datetime import datetime, timezone, timedelta
 
-          BODY="## ${DATE} — ${STATUS}\n\n[▶ Actionsログを見る](${RUN_URL})\n\n"
+          run_id   = os.environ['RUN_ID']
+          status   = os.environ['JOB_STATUS']
+          repo     = os.environ['REPO']
+          token    = os.environ['GITHUB_TOKEN']
+          jst      = datetime.now(timezone(timedelta(hours=9))).strftime('%Y-%m-%d %H:%M JST')
+          run_url  = f"https://github.com/{repo}/actions/runs/{run_id}"
 
-          JSON=$(ls fortune_bot/output/fortune_*.json 2>/dev/null | head -1)
-          if [ -n "$JSON" ]; then
-            SUMMARY=$(python3 -c "import json,sys; data=json.load(open(sys.argv[1])); fb=sum(1 for f in data if f.get('hook')=='今日も運気上昇中'); print(f'API成功: {len(data)-fb}/12  フォールバック: {fb}/12'); [print(('⚠️' if f.get('hook')=='今日も運気上昇中' else '✅')+' '+f['sign']+': '+f['hook']) for f in data]" "$JSON" 2>/dev/null || echo '(JSON解析失敗)')
-            BODY="${BODY}### 運勢生成結果\n\`\`\`\n${SUMMARY}\n\`\`\`\n\n"
-          fi
+          lines = [f"## {jst} — {status}", "", f"[▶ Actionsログを見る]({run_url})", ""]
 
-          if ls fortune_bot/logs/*.log 2>/dev/null | head -1 > /dev/null 2>&1; then
-            LOGS=$(cat fortune_bot/logs/*.log 2>/dev/null)
-            BODY="${BODY}### ログ\n\`\`\`\n${LOGS}\n\`\`\`\n"
-          fi
+          jsons = sorted(glob.glob("fortune_bot/output/fortune_*.json"))
+          if jsons:
+              try:
+                  data = json.load(open(jsons[-1]))
+                  fb = sum(1 for f in data if f.get('hook') == '今日も運気上昇中')
+                  lines += ["### 運勢生成結果", "```",
+                            f"API成功: {len(data)-fb}/12  フォールバック: {fb}/12"]
+                  for f in data:
+                      mark = '⚠️' if f.get('hook') == '今日も運気上昇中' else '✅'
+                      lines.append(f"{mark} {f['sign']}: {f['hook']}")
+                  lines += ["```", ""]
+              except Exception as e:
+                  lines.append(f"(JSON解析失敗: {e})")
 
-          curl -s -X POST \
-            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-            -H "Content-Type: application/json" \
-            "https://api.github.com/repos/${{ github.repository }}/issues/5/comments" \
-            -d "{\"body\": $(echo -e "$BODY" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')}"
+          logs = sorted(glob.glob("fortune_bot/logs/*.log"))
+          if logs:
+              lines += ["### ログ", "```"]
+              for lf in logs:
+                  lines += open(lf).read().splitlines()
+              lines.append("```")
+
+          body = "\n".join(lines)
+          payload = json.dumps({"body": body}).encode()
+          req = urllib.request.Request(
+              f"https://api.github.com/repos/{repo}/issues/5/comments",
+              data=payload,
+              headers={"Authorization": f"token {token}", "Content-Type": "application/json"},
+          )
+          resp = urllib.request.urlopen(req)
+          print(f"コメント投稿完了: HTTP {resp.status}")
+          PYEOF
