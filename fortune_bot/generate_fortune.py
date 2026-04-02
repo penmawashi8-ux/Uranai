@@ -29,9 +29,10 @@ load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 # 定数
 # ---------------------------------------------------------------------------
 
-MODEL_NAME   = "gemini-2.0-flash"
-MAX_RETRIES  = 3
-RETRY_WAIT   = 10  # リトライ間隔（秒）
+MODEL_NAME        = "gemini-2.0-flash"
+MAX_RETRIES       = 3
+RETRY_WAIT        = 15   # 通常リトライ間隔（秒）
+RATE_LIMIT_WAIT   = 65   # 429 レート制限時の待機（秒）
 
 TAROT_CARDS = [
     "愚者", "魔術師", "女教皇", "女帝", "皇帝", "教皇", "恋人", "戦車",
@@ -186,9 +187,13 @@ def generate_fortune_for_sign(
             fortune = _parse_fortune_json(text, zodiac, date)
             return fortune
         except Exception as e:
+            err_str = str(e)
+            is_rate_limit = "429" in err_str or "RESOURCE_EXHAUSTED" in err_str
+            wait = RATE_LIMIT_WAIT if is_rate_limit else RETRY_WAIT
             print(f"  ⚠️  [{zodiac['name']}] 試行 {attempt}/{MAX_RETRIES} 失敗: {e}")
             if attempt < MAX_RETRIES:
-                time.sleep(RETRY_WAIT)
+                print(f"  ⏳ {wait}秒待機{'（レート制限）' if is_rate_limit else ''}中...")
+                time.sleep(wait)
 
     print(f"  ❌  [{zodiac['name']}] すべてのリトライが失敗。フォールバックを使用します")
     fb = _make_fallback(zodiac, date)
