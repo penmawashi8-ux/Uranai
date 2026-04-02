@@ -10,7 +10,7 @@ on:
       upload:
         description: 'YouTubeにアップロードする'
         type: boolean
-        default: false
+        default: true
   schedule:
     # 毎朝6:00 JST（= 21:00 UTC 前日）
     - cron: '0 21 * * *'
