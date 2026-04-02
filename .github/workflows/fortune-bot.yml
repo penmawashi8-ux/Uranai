@@ -10,15 +10,19 @@ on:
       upload:
         description: 'YouTubeにアップロードする'
         type: boolean
-        default: false
+        default: true
   schedule:
     # 毎朝6:00 JST（= 21:00 UTC 前日）
     - cron: '0 21 * * *'
 
+permissions:
+  issues: write
+  contents: read
+
 jobs:
   fortune-bot:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
 
     steps:
       - name: Checkout
@@ -51,9 +55,15 @@ jobs:
           YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
         run: |
           python3 - <<'PYEOF'
-          import json, os
+          import json, os, sys
+          missing = [k for k in ["YOUTUBE_REFRESH_TOKEN","YOUTUBE_CLIENT_ID","YOUTUBE_CLIENT_SECRET"]
+                     if not os.environ.get(k,"").strip()]
+          if missing:
+              print(f"❌ 以下のシークレットが未設定です: {', '.join(missing)}")
+              print("GitHub Settings → Secrets → Actions で設定してください")
+              sys.exit(1)
           data = {
-              "token": "",
+              "token": None,
               "refresh_token": os.environ["YOUTUBE_REFRESH_TOKEN"].strip(),
               "token_uri": "https://oauth2.googleapis.com/token",
               "client_id": os.environ["YOUTUBE_CLIENT_ID"].strip(),
@@ -62,20 +72,34 @@ jobs:
           }
           with open("fortune_bot/token.json", "w") as f:
               json.dump(data, f)
-          print("token.json 作成完了")
+          cid = data["client_id"]
+          print(f"token.json 作成完了 (client_id: {cid[:12]}...{cid[-6:] if len(cid)>18 else ''})")
           PYEOF
 
       - name: セットアップ（フォント・背景画像生成）
         run: cd fortune_bot && python setup.py
 
       - name: 運勢テキスト生成（Gemini API）
-        run: cd fortune_bot && python generate_fortune.py
+        run: |
+          set +e
+          cd fortune_bot && python generate_fortune.py
+          CODE=$?
+          set -e
+          if [ "$CODE" -eq 2 ]; then
+            echo "::warning::全星座フォールバック。GEMINI_API_KEYを確認してください。"
+            exit 0
+          fi
+          exit "$CODE"
 
       - name: 動画生成
         run: |
-          SIGN="${{ github.event.inputs.sign }}"
-          SIGN="${SIGN:-おひつじ座}"
-          cd fortune_bot && python main.py --test --sign "$SIGN"
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            cd fortune_bot && python main.py --test --all
+          else
+            SIGN="${{ github.event.inputs.sign }}"
+            SIGN="${SIGN:-おひつじ座}"
+            cd fortune_bot && python main.py --test --sign "$SIGN"
+          fi
 
       - name: 生成した動画をアーティファクトに保存
         uses: actions/upload-artifact@v4
@@ -85,11 +109,15 @@ jobs:
           retention-days: 3
 
       - name: YouTubeアップロード
-        if: ${{ github.event.inputs.upload == 'true' }}
+        if: ${{ github.event_name == 'schedule' || github.event.inputs.upload == 'true' }}
         run: |
-          SIGN="${{ github.event.inputs.sign }}"
-          SIGN="${SIGN:-おひつじ座}"
-          cd fortune_bot && python main.py --sign "$SIGN"
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            cd fortune_bot && python main.py --all
+          else
+            SIGN="${{ github.event.inputs.sign }}"
+            SIGN="${SIGN:-おひつじ座}"
+            cd fortune_bot && python main.py --sign "$SIGN"
+          fi
 
       - name: ログをアーティファクトに保存
         if: always()
@@ -104,6 +132,7 @@ jobs:
 
       - name: 実行結果をIssueにコメント
         if: always()
+        continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RUN_ID: ${{ github.run_id }}

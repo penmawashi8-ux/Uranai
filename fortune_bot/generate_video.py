@@ -44,14 +44,15 @@ from generate_fortune import get_fortune_for_sign, load_fortunes
 # 定数
 # ---------------------------------------------------------------------------
 
-TOTAL_DURATION = 50  # 合計50秒
+TOTAL_DURATION   = 50  # 合計50秒
 
-SEC_INTRO   = 5
-SEC_HOOK    = 5
-SEC_SCORE   = 20   # 4項目 × 5秒
-SEC_LUCKY   = 8
-SEC_MESSAGE = 7
-SEC_OUTRO   = 5
+SEC_INTRO        = 3   # 星座名表示
+SEC_CARD_SELECT  = 6   # カード3枚（裏向き）+ 選択アニメーション
+SEC_CARD_FLIP    = 5   # カードリビール（表向き）
+SEC_SCORE        = 20  # 4項目 × 5秒
+SEC_LUCKY        = 7   # ラッキーカラー・アイテム
+SEC_MESSAGE      = 6   # メッセージ
+SEC_OUTRO        = 3   # アウトロ
 
 FONT_PATH = os.path.join(os.path.dirname(__file__), FONT_BOLD)
 
@@ -202,7 +203,7 @@ def _load_bgm(duration: float) -> AudioFileClip | None:
 # ---------------------------------------------------------------------------
 
 def _make_intro(fortune: dict, bg: ImageClip, color: str) -> CompositeVideoClip:
-    """イントロ（5秒）: 星座名＋絵文字をフェードイン表示。
+    """イントロ（3秒）: 星座名＋絵文字をフェードイン表示。
 
     Args:
         fortune: 運勢データ。
@@ -213,21 +214,86 @@ def _make_intro(fortune: dict, bg: ImageClip, color: str) -> CompositeVideoClip:
         CompositeVideoClip。
     """
     d = float(SEC_INTRO)
-    emoji_clip = _make_text_clip(fortune["emoji"], 160, color, duration=d)
-    name_clip  = _make_text_clip(fortune["sign"], 90, "white", duration=d)
-
-    emoji_pos = _center_clip(emoji_clip, 0.38)
-    name_pos  = _center_clip(name_clip,  0.55)
+    emoji_clip = _make_text_clip(fortune["emoji"], 140, color, duration=d)
+    name_clip  = _make_text_clip(fortune["sign"],  80, "white", duration=d)
 
     return CompositeVideoClip([
         bg.with_duration(d),
-        emoji_pos.with_effects([vfx.FadeIn(1.0)]),
-        name_pos.with_effects([vfx.FadeIn(1.5)]),
+        _center_clip(emoji_clip, 0.40).with_effects([vfx.FadeIn(0.6)]),
+        _center_clip(name_clip,  0.54).with_effects([vfx.FadeIn(0.9)]),
     ]).with_duration(d)
 
 
-def _make_hook(fortune: dict, bg: ImageClip, color: str) -> CompositeVideoClip:
-    """フック（5秒）: hook 文言を大きく表示。
+def _make_card(card_w: int, card_h: int, bg_color: tuple, text: str,
+               font_size: int, duration: float) -> CompositeVideoClip:
+    """カード1枚（ColorClip + テキスト）を生成する。"""
+    card_bg = ColorClip(size=(card_w, card_h), color=bg_color).with_duration(duration)
+    label   = TextClip(
+        font=FONT_PATH, text=text, font_size=font_size,
+        color="white", method="label",
+        stroke_color="black", stroke_width=2,
+    ).with_duration(duration)
+    return CompositeVideoClip(
+        [card_bg, label.with_position("center")], size=(card_w, card_h)
+    ).with_duration(duration)
+
+
+def _make_card_selection(bg: ImageClip, color: str) -> CompositeVideoClip:
+    """カード選択（6秒）: 3枚を裏向きで表示し中央カードをハイライト。
+
+    Args:
+        bg:    背景クリップ。
+        color: アクセントカラー。
+
+    Returns:
+        CompositeVideoClip。
+    """
+    d       = float(SEC_CARD_SELECT)
+    card_w  = 230
+    card_h  = 370
+    card_y  = int(H * 0.42) - card_h // 2
+    gap     = 290  # カード間隔（中心距離）
+    xs      = [W // 2 - gap - card_w // 2,
+               W // 2          - card_w // 2,
+               W // 2 + gap    - card_w // 2]
+
+    accent_rgb = _hex_to_rgb(color)
+    dark_rgb   = (45, 35, 75)
+
+    title = _make_text_clip("🃏 カードを1枚選んでください", 52, "white",
+                             method="label", duration=d)
+
+    clips: list = [
+        bg.with_duration(d),
+        _center_clip(title, 0.17).with_effects([vfx.FadeIn(0.5)]),
+    ]
+
+    for i, x in enumerate(xs):
+        is_center = (i == 1)
+        rgb   = accent_rgb if is_center else dark_rgb
+        delay = i * 0.35
+
+        card = _make_card(card_w, card_h, rgb, "？", 110, d)
+        clips.append(
+            card.with_position((x, card_y))
+                .with_effects([vfx.FadeIn(0.4)])
+                .with_start(delay)
+        )
+
+    # 3秒後：中央カードに「あなたのカード▼」インジケーター
+    indicator = _make_text_clip("✨ あなたのカード ✨", 46, color,
+                                 method="label", duration=d - 3.0)
+    clips.append(
+        _center_clip(indicator, 0.78)
+        .with_start(3.0)
+        .with_effects([vfx.FadeIn(0.5)])
+    )
+
+    return CompositeVideoClip(clips, size=(W, H)).with_duration(d)
+
+
+def _make_card_flip(fortune: dict, bg: ImageClip, color: str) -> CompositeVideoClip:
+    """カードリビール（5秒）: 裏→表のフリップ演出でタロットカード名を表示。
 
     Args:
         fortune: 運勢データ。
@@ -237,14 +303,44 @@ def _make_hook(fortune: dict, bg: ImageClip, color: str) -> CompositeVideoClip:
     Returns:
         CompositeVideoClip。
     """
-    d = float(SEC_HOOK)
-    hook_clip = _make_text_clip(fortune["hook"], 80, color, duration=d)
-    hook_pos  = _center_clip(hook_clip, 0.5)
+    d         = float(SEC_CARD_FLIP)
+    card_w    = 280
+    card_h    = 450
+    card_x    = W // 2 - card_w // 2
+    card_y    = int(H * 0.36) - card_h // 2
+    reveal_t  = 1.5   # カード表向きになる時刻
+
+    accent_rgb = _hex_to_rgb(color)
+    card_name  = fortune.get("card", "星")
+    orient     = fortune.get("card_orientation", "正位置")
+
+    # --- 裏向きカード（0 → reveal_t でフェードアウト）---
+    back = _make_card(card_w, card_h, accent_rgb, "？", 130, reveal_t)
+
+    # --- フラッシュ（白い一瞬） ---
+    flash_dur = 0.25
+    flash = ColorClip(size=(card_w, card_h), color=(255, 255, 255)).with_duration(flash_dur)
+
+    # --- 表向きカード（2行: カード名 + 向き）---
+    face_dur  = d - reveal_t - flash_dur
+    face_text = f"{card_name}\n{orient}"
+    face = _make_card(card_w, card_h, accent_rgb, face_text, 68, face_dur)
+
+    # 裏→フラッシュ→表 を連結してカード位置へ
+    card_seq = concatenate_videoclips([back, flash, face]).with_position((card_x, card_y))
+
+    # --- 大きなカード名テキスト（表向き後にフェードイン）---
+    big_name   = _make_text_clip(f"✨ {card_name} ✨", 82, color,
+                                  method="label", duration=face_dur)
+    big_orient = _make_text_clip(orient, 56, "white",
+                                  method="label", duration=face_dur)
 
     return CompositeVideoClip([
         bg.with_duration(d),
-        hook_pos.with_effects([vfx.FadeIn(0.5)]),
-    ]).with_duration(d)
+        card_seq,
+        _center_clip(big_name,   0.85).with_start(reveal_t + flash_dur).with_effects([vfx.FadeIn(0.5)]),
+        _center_clip(big_orient, 0.94).with_start(reveal_t + flash_dur).with_effects([vfx.FadeIn(0.8)]),
+    ], size=(W, H)).with_duration(d)
 
 
 def _make_score_section(fortune: dict, bg: ImageClip, color: str) -> CompositeVideoClip:
@@ -388,21 +484,23 @@ def generate_video(fortune: dict, slug: str, date: str) -> str:
 
     # 各セクション生成
     print("  📦 イントロ生成...")
-    intro   = _make_intro(fortune, bg(SEC_INTRO), color)
-    print("  📦 フック生成...")
-    hook    = _make_hook(fortune, bg(SEC_HOOK), color)
+    intro       = _make_intro(fortune, bg(SEC_INTRO), color)
+    print("  📦 カード選択生成...")
+    card_select = _make_card_selection(bg(SEC_CARD_SELECT), color)
+    print("  📦 カードリビール生成...")
+    card_flip   = _make_card_flip(fortune, bg(SEC_CARD_FLIP), color)
     print("  📦 スコア生成...")
-    score   = _make_score_section(fortune, bg(SEC_SCORE), color)
+    score       = _make_score_section(fortune, bg(SEC_SCORE), color)
     print("  📦 ラッキー情報生成...")
-    lucky   = _make_lucky(fortune, bg(SEC_LUCKY), color)
+    lucky       = _make_lucky(fortune, bg(SEC_LUCKY), color)
     print("  📦 メッセージ生成...")
-    message = _make_message(fortune, bg(SEC_MESSAGE))
+    message     = _make_message(fortune, bg(SEC_MESSAGE))
     print("  📦 アウトロ生成...")
-    outro   = _make_outro(bg(SEC_OUTRO), color)
+    outro       = _make_outro(bg(SEC_OUTRO), color)
 
     # 結合
     print("  🔗 クリップを結合中...")
-    video = concatenate_videoclips([intro, hook, score, lucky, message, outro])
+    video = concatenate_videoclips([intro, card_select, card_flip, score, lucky, message, outro])
 
     # BGM 追加
     bgm = _load_bgm(video.duration)

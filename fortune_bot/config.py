@@ -35,7 +35,7 @@ OUTPUT_DIR      = os.path.join(BASE_DIR, "output")
 LOGS_DIR        = os.path.join(BASE_DIR, "logs")
 
 # Gemini APIレート制限対策
-GEMINI_SLEEP_SEC = 5
+GEMINI_SLEEP_SEC = 8  # 15RPM制限対策（8秒間隔 ≈ 7.5リクエスト/分）
 
 # YouTube API制限
 YOUTUBE_MAX_UPLOADS_PER_DAY = 6  # 1日10,000ユニット / 1600ユニット per upload

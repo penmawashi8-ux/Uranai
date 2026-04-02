@@ -29,25 +29,35 @@ load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 # 定数
 # ---------------------------------------------------------------------------
 
-MODEL_NAME   = "gemini-2.0-flash"
-MAX_RETRIES  = 3
-RETRY_WAIT   = 10  # リトライ間隔（秒）
+MODEL_NAME        = "gemini-2.0-flash"
+MAX_RETRIES       = 2   # 429待機65s × 1回 = 65s/星座。12星座 × 65s = 13分（タイムアウト余裕あり）
+RETRY_WAIT        = 15   # 通常リトライ間隔（秒）
+RATE_LIMIT_WAIT   = 65   # 429 レート制限時の待機（秒）
+
+TAROT_CARDS = [
+    "愚者", "魔術師", "女教皇", "女帝", "皇帝", "教皇", "恋人", "戦車",
+    "力", "隠者", "運命の輪", "正義", "吊られた男", "死神", "節制",
+    "悪魔", "塔", "星", "月", "太陽", "審判", "世界",
+]
 
 JSON_SCHEMA = """{
   "sign": "星座名（日本語）",
   "emoji": "絵文字",
+  "card": "タロットカード名（例: 太陽）",
+  "card_orientation": "正位置 または 逆位置",
   "overall": "★★★★☆",
   "love": "★★★☆☆",
   "work": "★★★★★",
   "money": "★★★☆☆",
   "lucky_color": "色名",
   "lucky_item": "アイテム名",
-  "message": "100文字程度のメッセージ",
+  "message": "100文字程度のメッセージ（引いたカードの解釈を含む）",
   "hook": "15文字以内のキャッチコピー"
 }"""
 
-PROMPT_TEMPLATE = """あなたはプロの占い師です。{date}の{sign}の運勢を以下のJSON形式のみで出力してください。
-説明文・コードブロック不要。JSONのみ。
+PROMPT_TEMPLATE = """あなたはプロのタロット占い師です。{date}の{sign}の運勢を占います。
+タロットの大アルカナ（{cards}）から1枚カードを引き、正位置か逆位置かを決めてください。
+以下のJSON形式のみで出力してください。説明文・コードブロック不要。JSONのみ。
 バズるSNS向けに「今日だけ」「見た人だけ」などの表現を自然に使ってください。
 hookは15文字以内の強いキャッチコピーにしてください。
 {json_schema}"""
@@ -55,6 +65,22 @@ hookは15文字以内の強いキャッチコピーにしてください。
 # ---------------------------------------------------------------------------
 # フォールバック用デフォルト値
 # ---------------------------------------------------------------------------
+
+# 星座ごとに対応するタロットカード（フォールバック用）
+_ZODIAC_TAROT = {
+    "おひつじ座":  ("魔術師",     "正位置"),
+    "おうし座":    ("女帝",       "正位置"),
+    "ふたご座":    ("恋人",       "正位置"),
+    "かに座":      ("月",         "正位置"),
+    "しし座":      ("太陽",       "正位置"),
+    "おとめ座":    ("隠者",       "正位置"),
+    "てんびん座":  ("正義",       "正位置"),
+    "さそり座":    ("死神",       "逆位置"),
+    "いて座":      ("節制",       "正位置"),
+    "やぎ座":      ("世界",       "正位置"),
+    "みずがめ座":  ("星",         "正位置"),
+    "うお座":      ("審判",       "正位置"),
+}
 
 def _make_fallback(zodiac: dict, date: str) -> dict:
     """JSON パース失敗時のフォールバックデータを生成する。
@@ -66,17 +92,20 @@ def _make_fallback(zodiac: dict, date: str) -> dict:
     Returns:
         運勢データの辞書。
     """
+    card, orient = _ZODIAC_TAROT.get(zodiac["name"], ("星", "正位置"))
     return {
-        "sign":        zodiac["name"],
-        "emoji":       zodiac["emoji"],
-        "overall":     "★★★☆☆",
-        "love":        "★★★☆☆",
-        "work":        "★★★☆☆",
-        "money":       "★★★☆☆",
-        "lucky_color": "ホワイト",
-        "lucky_item":  "水晶",
-        "message":     f"{date}の{zodiac['name']}は穏やかな一日です。焦らず着実に進みましょう。",
-        "hook":        "今日も運気上昇中",
+        "sign":             zodiac["name"],
+        "emoji":            zodiac["emoji"],
+        "card":             card,
+        "card_orientation": orient,
+        "overall":          "★★★☆☆",
+        "love":             "★★★☆☆",
+        "work":             "★★★☆☆",
+        "money":            "★★★☆☆",
+        "lucky_color":      "ホワイト",
+        "lucky_item":       "水晶",
+        "message":          f"「{card}」のカードが{zodiac['name']}に届いています。今日は内なる声に耳を傾けて。",
+        "hook":             f"{card}のカードが導く",
     }
 
 
@@ -133,7 +162,7 @@ def _parse_fortune_json(text: str, zodiac: dict, date: str) -> dict:
     try:
         data = json.loads(cleaned)
         # 必須キーが揃っているか検証
-        required = ["sign", "emoji", "overall", "love", "work", "money",
+        required = ["sign", "emoji", "card", "card_orientation", "overall", "love", "work", "money",
                     "lucky_color", "lucky_item", "message", "hook"]
         for key in required:
             if key not in data:
@@ -165,6 +194,7 @@ def generate_fortune_for_sign(
     prompt = PROMPT_TEMPLATE.format(
         date=date,
         sign=zodiac["name"],
+        cards="・".join(TAROT_CARDS),
         json_schema=JSON_SCHEMA,
     )
 
@@ -174,9 +204,13 @@ def generate_fortune_for_sign(
             fortune = _parse_fortune_json(text, zodiac, date)
             return fortune
         except Exception as e:
+            err_str = str(e)
+            is_rate_limit = "429" in err_str or "RESOURCE_EXHAUSTED" in err_str
+            wait = RATE_LIMIT_WAIT if is_rate_limit else RETRY_WAIT
             print(f"  ⚠️  [{zodiac['name']}] 試行 {attempt}/{MAX_RETRIES} 失敗: {e}")
             if attempt < MAX_RETRIES:
-                time.sleep(RETRY_WAIT)
+                print(f"  ⏳ {wait}秒待機{'（レート制限）' if is_rate_limit else ''}中...")
+                time.sleep(wait)
 
     print(f"  ❌  [{zodiac['name']}] すべてのリトライが失敗。フォールバックを使用します")
     fb = _make_fallback(zodiac, date)
@@ -213,8 +247,10 @@ def generate_all_fortunes(date: str) -> list[dict]:
     for i, zodiac in enumerate(ZODIAC_LIST):
         print(f"  [{i + 1:02d}/12] {zodiac['name']} ...", end=" ", flush=True)
         fortune = generate_fortune_for_sign(client, zodiac, date)
-        if fortune.pop("_fallback", False):
+        if fortune.get("_fallback"):
             fallback_count += 1
+        else:
+            fortune.pop("_fallback", None)  # API成功時は不要なキーを除去
         fortunes.append(fortune)
         print(f"完了（hook: {fortune['hook'][:15]}）")
 
@@ -236,8 +272,9 @@ def generate_all_fortunes(date: str) -> list[dict]:
     print(f"{'=' * 40}")
 
     if fallback_count == len(ZODIAC_LIST):
-        print("❌ 全星座がAPIエラーのためフォールバックを使用しました。GEMINI_API_KEYとモデル名を確認してください。")
-        sys.exit(1)
+        print("⚠️  全星座がAPIエラーのためフォールバックを使用しました。GEMINI_API_KEYとモデル名を確認してください。")
+        print("⚠️  フォールバックデータで動画生成を続行します。")
+        sys.exit(2)
 
     return fortunes
 
