@@ -63,7 +63,7 @@ jobs:
               print("GitHub Settings → Secrets → Actions で設定してください")
               sys.exit(1)
           data = {
-              "token": "",
+              "token": None,
               "refresh_token": os.environ["YOUTUBE_REFRESH_TOKEN"].strip(),
               "token_uri": "https://oauth2.googleapis.com/token",
               "client_id": os.environ["YOUTUBE_CLIENT_ID"].strip(),

@@ -93,7 +93,7 @@ def get_credentials() -> Credentials:
     if os.path.isfile(TOKEN_PATH):
         creds = Credentials.from_authorized_user_file(TOKEN_PATH, SCOPES)
 
-    if not creds or not creds.valid:
+    if not creds or not creds.valid or not creds.token:
         if creds and creds.refresh_token:
             creds.refresh(Request())
         else:
