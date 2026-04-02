@@ -55,7 +55,13 @@ jobs:
           YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
         run: |
           python3 - <<'PYEOF'
-          import json, os
+          import json, os, sys
+          missing = [k for k in ["YOUTUBE_REFRESH_TOKEN","YOUTUBE_CLIENT_ID","YOUTUBE_CLIENT_SECRET"]
+                     if not os.environ.get(k,"").strip()]
+          if missing:
+              print(f"❌ 以下のシークレットが未設定です: {', '.join(missing)}")
+              print("GitHub Settings → Secrets → Actions で設定してください")
+              sys.exit(1)
           data = {
               "token": "",
               "refresh_token": os.environ["YOUTUBE_REFRESH_TOKEN"].strip(),
@@ -66,7 +72,8 @@ jobs:
           }
           with open("fortune_bot/token.json", "w") as f:
               json.dump(data, f)
-          print("token.json 作成完了")
+          cid = data["client_id"]
+          print(f"token.json 作成完了 (client_id: {cid[:12]}...{cid[-6:] if len(cid)>18 else ''})")
           PYEOF
 
       - name: セットアップ（フォント・背景画像生成）
