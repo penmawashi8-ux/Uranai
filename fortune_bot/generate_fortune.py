@@ -33,21 +33,30 @@ MODEL_NAME   = "gemini-2.0-flash"
 MAX_RETRIES  = 3
 RETRY_WAIT   = 10  # リトライ間隔（秒）
 
+TAROT_CARDS = [
+    "愚者", "魔術師", "女教皇", "女帝", "皇帝", "教皇", "恋人", "戦車",
+    "力", "隠者", "運命の輪", "正義", "吊られた男", "死神", "節制",
+    "悪魔", "塔", "星", "月", "太陽", "審判", "世界",
+]
+
 JSON_SCHEMA = """{
   "sign": "星座名（日本語）",
   "emoji": "絵文字",
+  "card": "タロットカード名（例: 太陽）",
+  "card_orientation": "正位置 または 逆位置",
   "overall": "★★★★☆",
   "love": "★★★☆☆",
   "work": "★★★★★",
   "money": "★★★☆☆",
   "lucky_color": "色名",
   "lucky_item": "アイテム名",
-  "message": "100文字程度のメッセージ",
+  "message": "100文字程度のメッセージ（引いたカードの解釈を含む）",
   "hook": "15文字以内のキャッチコピー"
 }"""
 
-PROMPT_TEMPLATE = """あなたはプロの占い師です。{date}の{sign}の運勢を以下のJSON形式のみで出力してください。
-説明文・コードブロック不要。JSONのみ。
+PROMPT_TEMPLATE = """あなたはプロのタロット占い師です。{date}の{sign}の運勢を占います。
+タロットの大アルカナ（{cards}）から1枚カードを引き、正位置か逆位置かを決めてください。
+以下のJSON形式のみで出力してください。説明文・コードブロック不要。JSONのみ。
 バズるSNS向けに「今日だけ」「見た人だけ」などの表現を自然に使ってください。
 hookは15文字以内の強いキャッチコピーにしてください。
 {json_schema}"""
@@ -67,16 +76,18 @@ def _make_fallback(zodiac: dict, date: str) -> dict:
         運勢データの辞書。
     """
     return {
-        "sign":        zodiac["name"],
-        "emoji":       zodiac["emoji"],
-        "overall":     "★★★☆☆",
-        "love":        "★★★☆☆",
-        "work":        "★★★☆☆",
-        "money":       "★★★☆☆",
-        "lucky_color": "ホワイト",
-        "lucky_item":  "水晶",
-        "message":     f"{date}の{zodiac['name']}は穏やかな一日です。焦らず着実に進みましょう。",
-        "hook":        "今日も運気上昇中",
+        "sign":             zodiac["name"],
+        "emoji":            zodiac["emoji"],
+        "card":             "星",
+        "card_orientation": "正位置",
+        "overall":          "★★★☆☆",
+        "love":             "★★★☆☆",
+        "work":             "★★★☆☆",
+        "money":            "★★★☆☆",
+        "lucky_color":      "ホワイト",
+        "lucky_item":       "水晶",
+        "message":          f"{date}の{zodiac['name']}は穏やかな一日です。焦らず着実に進みましょう。",
+        "hook":             "今日も運気上昇中",
     }
 
 
@@ -133,7 +144,7 @@ def _parse_fortune_json(text: str, zodiac: dict, date: str) -> dict:
     try:
         data = json.loads(cleaned)
         # 必須キーが揃っているか検証
-        required = ["sign", "emoji", "overall", "love", "work", "money",
+        required = ["sign", "emoji", "card", "card_orientation", "overall", "love", "work", "money",
                     "lucky_color", "lucky_item", "message", "hook"]
         for key in required:
             if key not in data:
@@ -165,6 +176,7 @@ def generate_fortune_for_sign(
     prompt = PROMPT_TEMPLATE.format(
         date=date,
         sign=zodiac["name"],
+        cards="・".join(TAROT_CARDS),
         json_schema=JSON_SCHEMA,
     )
 

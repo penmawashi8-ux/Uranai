@@ -226,8 +226,8 @@ def _make_intro(fortune: dict, bg: ImageClip, color: str) -> CompositeVideoClip:
     ]).with_duration(d)
 
 
-def _make_hook(fortune: dict, bg: ImageClip, color: str) -> CompositeVideoClip:
-    """フック（5秒）: hook 文言を大きく表示。
+def _make_card_reveal(fortune: dict, bg: ImageClip, color: str) -> CompositeVideoClip:
+    """カードリビール（5秒）: タロットカード名と位置を表示。
 
     Args:
         fortune: 運勢データ。
@@ -238,12 +238,21 @@ def _make_hook(fortune: dict, bg: ImageClip, color: str) -> CompositeVideoClip:
         CompositeVideoClip。
     """
     d = float(SEC_HOOK)
-    hook_clip = _make_text_clip(fortune["hook"], 80, color, duration=d)
-    hook_pos  = _center_clip(hook_clip, 0.5)
+    label_clip = _make_text_clip("🃏 今日のカード", 50, "white", method="label", duration=d)
+    card_clip  = _make_text_clip(fortune.get("card", "星"), 90, color, method="label", duration=d)
+    orient_clip = _make_text_clip(
+        fortune.get("card_orientation", "正位置"), 55, "white", method="label", duration=d
+    )
+
+    label_pos  = _center_clip(label_clip,  0.38)
+    card_pos   = _center_clip(card_clip,   0.50)
+    orient_pos = _center_clip(orient_clip, 0.62)
 
     return CompositeVideoClip([
         bg.with_duration(d),
-        hook_pos.with_effects([vfx.FadeIn(0.5)]),
+        label_pos.with_effects([vfx.FadeIn(0.5)]),
+        card_pos.with_effects([vfx.FadeIn(0.8)]),
+        orient_pos.with_effects([vfx.FadeIn(1.2)]),
     ]).with_duration(d)
 
 
@@ -389,8 +398,8 @@ def generate_video(fortune: dict, slug: str, date: str) -> str:
     # 各セクション生成
     print("  📦 イントロ生成...")
     intro   = _make_intro(fortune, bg(SEC_INTRO), color)
-    print("  📦 フック生成...")
-    hook    = _make_hook(fortune, bg(SEC_HOOK), color)
+    print("  📦 カードリビール生成...")
+    hook    = _make_card_reveal(fortune, bg(SEC_HOOK), color)
     print("  📦 スコア生成...")
     score   = _make_score_section(fortune, bg(SEC_SCORE), color)
     print("  📦 ラッキー情報生成...")

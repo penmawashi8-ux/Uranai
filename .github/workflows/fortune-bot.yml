@@ -73,9 +73,13 @@ jobs:
 
       - name: 動画生成
         run: |
-          SIGN="${{ github.event.inputs.sign }}"
-          SIGN="${SIGN:-おひつじ座}"
-          cd fortune_bot && python main.py --test --sign "$SIGN"
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            cd fortune_bot && python main.py --test --all
+          else
+            SIGN="${{ github.event.inputs.sign }}"
+            SIGN="${SIGN:-おひつじ座}"
+            cd fortune_bot && python main.py --test --sign "$SIGN"
+          fi
 
       - name: 生成した動画をアーティファクトに保存
         uses: actions/upload-artifact@v4
@@ -85,11 +89,15 @@ jobs:
           retention-days: 3
 
       - name: YouTubeアップロード
-        if: ${{ github.event.inputs.upload == 'true' }}
+        if: ${{ github.event_name == 'schedule' || github.event.inputs.upload == 'true' }}
         run: |
-          SIGN="${{ github.event.inputs.sign }}"
-          SIGN="${SIGN:-おひつじ座}"
-          cd fortune_bot && python main.py --sign "$SIGN"
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            cd fortune_bot && python main.py --all
+          else
+            SIGN="${{ github.event.inputs.sign }}"
+            SIGN="${SIGN:-おひつじ座}"
+            cd fortune_bot && python main.py --sign "$SIGN"
+          fi
 
       - name: ログをアーティファクトに保存
         if: always()

@@ -94,7 +94,7 @@ def get_credentials() -> Credentials:
         creds = Credentials.from_authorized_user_file(TOKEN_PATH, SCOPES)
 
     if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
+        if creds and creds.refresh_token:
             creds.refresh(Request())
         else:
             # client_secrets.json があればそちらを優先
