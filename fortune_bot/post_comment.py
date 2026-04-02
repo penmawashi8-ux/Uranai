@@ -23,15 +23,18 @@ jsons = sorted(glob.glob("fortune_bot/output/fortune_*.json"))
 if jsons:
     try:
         data = json.load(open(jsons[-1]))
-        fb = sum(1 for f in data if f.get("hook") == "今日も運気上昇中")
+        fb = sum(1 for f in data if f.get("_fallback"))
         lines += [
-            "### 運勢生成結果",
+            "### タロット占い生成結果",
             "```",
             f"API成功: {len(data)-fb}/12  フォールバック: {fb}/12",
         ]
         for f in data:
-            mark = "!!" if f.get("hook") == "今日も運気上昇中" else "OK"
-            lines.append(f"{mark} {f['sign']}: {f['hook']}")
+            is_fb = f.get("_fallback", False)
+            mark = "FB" if is_fb else "OK"
+            card = f.get("card", "?")
+            orient = f.get("card_orientation", "")
+            lines.append(f"{mark} {f['sign']}: 🃏{card}({orient})  {f['hook']}")
         lines += ["```", ""]
     except Exception as e:
         lines.append(f"(JSON解析失敗: {e})")

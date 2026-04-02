@@ -30,7 +30,7 @@ load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 # ---------------------------------------------------------------------------
 
 MODEL_NAME        = "gemini-2.0-flash"
-MAX_RETRIES       = 3
+MAX_RETRIES       = 2   # 429待機65s × 1回 = 65s/星座。12星座 × 65s = 13分（タイムアウト余裕あり）
 RETRY_WAIT        = 15   # 通常リトライ間隔（秒）
 RATE_LIMIT_WAIT   = 65   # 429 レート制限時の待機（秒）
 
@@ -66,6 +66,22 @@ hookは15文字以内の強いキャッチコピーにしてください。
 # フォールバック用デフォルト値
 # ---------------------------------------------------------------------------
 
+# 星座ごとに対応するタロットカード（フォールバック用）
+_ZODIAC_TAROT = {
+    "おひつじ座":  ("魔術師",     "正位置"),
+    "おうし座":    ("女帝",       "正位置"),
+    "ふたご座":    ("恋人",       "正位置"),
+    "かに座":      ("月",         "正位置"),
+    "しし座":      ("太陽",       "正位置"),
+    "おとめ座":    ("隠者",       "正位置"),
+    "てんびん座":  ("正義",       "正位置"),
+    "さそり座":    ("死神",       "逆位置"),
+    "いて座":      ("節制",       "正位置"),
+    "やぎ座":      ("世界",       "正位置"),
+    "みずがめ座":  ("星",         "正位置"),
+    "うお座":      ("審判",       "正位置"),
+}
+
 def _make_fallback(zodiac: dict, date: str) -> dict:
     """JSON パース失敗時のフォールバックデータを生成する。
 
@@ -76,19 +92,20 @@ def _make_fallback(zodiac: dict, date: str) -> dict:
     Returns:
         運勢データの辞書。
     """
+    card, orient = _ZODIAC_TAROT.get(zodiac["name"], ("星", "正位置"))
     return {
         "sign":             zodiac["name"],
         "emoji":            zodiac["emoji"],
-        "card":             "星",
-        "card_orientation": "正位置",
+        "card":             card,
+        "card_orientation": orient,
         "overall":          "★★★☆☆",
         "love":             "★★★☆☆",
         "work":             "★★★☆☆",
         "money":            "★★★☆☆",
         "lucky_color":      "ホワイト",
         "lucky_item":       "水晶",
-        "message":          f"{date}の{zodiac['name']}は穏やかな一日です。焦らず着実に進みましょう。",
-        "hook":             "今日も運気上昇中",
+        "message":          f"「{card}」のカードが{zodiac['name']}に届いています。今日は内なる声に耳を傾けて。",
+        "hook":             f"{card}のカードが導く",
     }
 
 
@@ -230,8 +247,10 @@ def generate_all_fortunes(date: str) -> list[dict]:
     for i, zodiac in enumerate(ZODIAC_LIST):
         print(f"  [{i + 1:02d}/12] {zodiac['name']} ...", end=" ", flush=True)
         fortune = generate_fortune_for_sign(client, zodiac, date)
-        if fortune.pop("_fallback", False):
+        if fortune.get("_fallback"):
             fallback_count += 1
+        else:
+            fortune.pop("_fallback", None)  # API成功時は不要なキーを除去
         fortunes.append(fortune)
         print(f"完了（hook: {fortune['hook'][:15]}）")
 
