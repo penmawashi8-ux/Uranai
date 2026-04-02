@@ -284,25 +284,15 @@ def _generate_bg_imagemagick(cmd: str, zodiac: dict) -> None:
             os.remove(tmp)
 
 
-def _ensure_pillow() -> None:
-    """Pillow が使えない場合はインストールする。"""
-    try:
-        import PIL  # noqa: F401
-    except ImportError:
-        print("  Pillow をインストールします...")
-        subprocess.run(
-            [sys.executable, "-m", "pip", "install", "Pillow"],
-            check=True,
-        )
-
-
-def _generate_bg_pillow(zodiac: dict) -> None:
-    """Pillow で1星座分の背景画像を生成する（ImageMagick のフォールバック）。
+def _generate_bg_numpy(zodiac: dict) -> None:
+    """numpy+zlibでPillowを使わずに背景画像を生成する。
 
     Args:
         zodiac: ZODIAC_LIST の1要素。
     """
-    from PIL import Image, ImageDraw  # noqa: PLC0415
+    import struct
+    import zlib
+    import numpy as np
 
     slug   = zodiac["slug"]
     mid    = zodiac["mid"]
@@ -318,58 +308,67 @@ def _generate_bg_pillow(zodiac: dict) -> None:
 
     r1, g1, b1 = hex_to_rgb(mid)
     r2, g2, b2 = hex_to_rgb(dark)
+    ar, ag, ab = hex_to_rgb(color)
 
-    # グラデーション背景
-    img = Image.new("RGB", (W, H))
-    for y in range(H):
-        t = y / (H - 1)
-        r = int(r1 + (r2 - r1) * t)
-        g = int(g1 + (g2 - g1) * t)
-        b = int(b1 + (b2 - b1) * t)
-        for x in range(W):
-            img.putpixel((x, y), (r, g, b))
-
-    draw = ImageDraw.Draw(img)
-    rng = random.Random(slug)
+    # グラデーション背景（numpy）
+    t = np.linspace(0, 1, H)[:, None]
+    r = (r1 + (r2 - r1) * t).astype(np.uint8)
+    g = (g1 + (g2 - g1) * t).astype(np.uint8)
+    b = (b1 + (b2 - b1) * t).astype(np.uint8)
+    img = np.stack([np.repeat(r, W, axis=1),
+                    np.repeat(g, W, axis=1),
+                    np.repeat(b, W, axis=1)], axis=2)  # (H, W, 3)
 
     # 白い星100個
+    rng = random.Random(slug)
     for _ in range(100):
-        x = rng.randint(10, W - 10)
-        y = rng.randint(10, H - 10)
-        r = rng.randint(1, 3)
-        draw.ellipse([x - r, y - r, x + r, y + r], fill="white")
+        x = rng.randint(5, W - 5)
+        y = rng.randint(5, H - 5)
+        r_ = rng.randint(1, 3)
+        img[max(0,y-r_):y+r_+1, max(0,x-r_):x+r_+1] = [255, 255, 255]
 
     # アクセントカラーの星12個
-    ar, ag, ab = hex_to_rgb(color)
     for _ in range(12):
-        x = rng.randint(10, W - 10)
-        y = rng.randint(10, H - 10)
-        draw.ellipse([x - 3, y - 3, x + 3, y + 3], fill=(ar, ag, ab))
+        x = rng.randint(5, W - 5)
+        y = rng.randint(5, H - 5)
+        img[max(0,y-3):y+4, max(0,x-3):x+4] = [ar, ag, ab]
 
-    # 下部オーバーレイ（半透明の黒）
-    overlay = Image.new("RGBA", (W, 700), (0, 0, 0, 0))
-    ov_draw = ImageDraw.Draw(overlay)
-    for i in range(700):
-        alpha = int(255 * (i / 700))
-        ov_draw.line([(0, i), (W, i)], fill=(0, 0, 0, alpha))
-    img = img.convert("RGBA")
-    img.paste(overlay, (0, H - 700), overlay)
-    img = img.convert("RGB")
+    # 下部グラデーションオーバーレイ（黒を徐々に重ねる）
+    ov_h = 700
+    alpha = np.linspace(0, 0.75, ov_h)
+    for i, a in enumerate(alpha):
+        row = H - ov_h + i
+        img[row] = (img[row] * (1 - a)).astype(np.uint8)
 
-    img.save(output, "PNG")
+    # numpy配列をPNGとして保存（Pillowなし）
+    def write_png(path: str, arr: "np.ndarray") -> None:
+        h, w = arr.shape[:2]
+        raw_rows = b"".join(b"\x00" + arr[y].tobytes() for y in range(h))
+        compressed = zlib.compress(raw_rows, 9)
+
+        def chunk(tag: bytes, data: bytes) -> bytes:
+            c = struct.pack(">I", len(data)) + tag + data
+            return c + struct.pack(">I", zlib.crc32(tag + data) & 0xFFFFFFFF)
+
+        with open(path, "wb") as f:
+            f.write(b"\x89PNG\r\n\x1a\n")
+            f.write(chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 2, 0, 0, 0)))
+            f.write(chunk(b"IDAT", compressed))
+            f.write(chunk(b"IEND", b""))
+
+    write_png(output, img)
 
 
 def generate_backgrounds(imagemagick_cmd: str | None) -> None:
     """12星座分の背景画像を生成する。
 
-    ImageMagick が使えればそちらを優先し、なければ Pillow を使う。
+    ImageMagick が使えればそちらを優先し、なければ numpy で生成する（Pillow 不使用）。
 
     Args:
-        imagemagick_cmd: ImageMagick コマンド名。None の場合は Pillow を使う。
+        imagemagick_cmd: ImageMagick コマンド名。None の場合は numpy を使う。
     """
     if imagemagick_cmd is None:
-        print("⚠️  ImageMagick が見つかりません。Pillow を使って生成します...")
-        _ensure_pillow()
+        print("⚠️  ImageMagick が見つかりません。numpy で生成します（Pillow 不使用）...")
 
     for zodiac in ZODIAC_LIST:
         slug   = zodiac["slug"]
@@ -383,7 +382,7 @@ def generate_backgrounds(imagemagick_cmd: str | None) -> None:
         if imagemagick_cmd:
             _generate_bg_imagemagick(imagemagick_cmd, zodiac)
         else:
-            _generate_bg_pillow(zodiac)
+            _generate_bg_numpy(zodiac)
         print("完了")
 
     print("✅ 背景画像の生成が完了しました")
