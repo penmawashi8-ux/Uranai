@@ -15,6 +15,10 @@ on:
     # 毎朝6:00 JST（= 21:00 UTC 前日）
     - cron: '0 21 * * *'
 
+permissions:
+  issues: write
+  contents: read
+
 jobs:
   fortune-bot:
     runs-on: ubuntu-latest
@@ -112,6 +116,7 @@ jobs:
 
       - name: 実行結果をIssueにコメント
         if: always()
+        continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RUN_ID: ${{ github.run_id }}

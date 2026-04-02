@@ -40,7 +40,7 @@ logs = sorted(glob.glob("fortune_bot/logs/*.log"))
 if logs:
     lines += ["### ログ", "```"]
     for lf in logs:
-        lines += open(lf).read().splitlines()
+        lines += open(lf, encoding="utf-8").read().splitlines()
     lines.append("```")
 
 body = "\n".join(lines)
@@ -53,5 +53,13 @@ req = urllib.request.Request(
         "Content-Type": "application/json",
     },
 )
-resp = urllib.request.urlopen(req)
-print(f"コメント投稿完了: HTTP {resp.status}")
+try:
+    resp = urllib.request.urlopen(req)
+    print(f"コメント投稿完了: HTTP {resp.status}")
+except urllib.error.HTTPError as e:
+    print(f"コメント投稿失敗: HTTP {e.code} {e.reason}")
+    print(e.read().decode())
+    raise
+except Exception as e:
+    print(f"コメント投稿エラー: {e}")
+    raise
