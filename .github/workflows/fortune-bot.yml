@@ -73,7 +73,13 @@ jobs:
         run: cd fortune_bot && python setup.py
 
       - name: 運勢テキスト生成（Gemini API）
-        run: cd fortune_bot && python generate_fortune.py
+        run: |
+          cd fortune_bot && python generate_fortune.py; CODE=$?
+          if [ $CODE -eq 2 ]; then
+            echo "::warning::全星座フォールバック。GEMINI_API_KEYを確認してください。"
+            exit 0
+          fi
+          exit $CODE
 
       - name: 動画生成
         run: |

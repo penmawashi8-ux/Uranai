@@ -248,8 +248,9 @@ def generate_all_fortunes(date: str) -> list[dict]:
     print(f"{'=' * 40}")
 
     if fallback_count == len(ZODIAC_LIST):
-        print("❌ 全星座がAPIエラーのためフォールバックを使用しました。GEMINI_API_KEYとモデル名を確認してください。")
-        sys.exit(1)
+        print("⚠️  全星座がAPIエラーのためフォールバックを使用しました。GEMINI_API_KEYとモデル名を確認してください。")
+        print("⚠️  フォールバックデータで動画生成を続行します。")
+        sys.exit(2)
 
     return fortunes
 
