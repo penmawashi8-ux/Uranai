@@ -43,9 +43,10 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
           YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
         run: |
-          printf 'GEMINI_API_KEY=%s\nYOUTUBE_CLIENT_ID=%s\nYOUTUBE_CLIENT_SECRET=%s\nCHANNEL_NAME=占い動画チャンネル\n' \
-            "$GEMINI_API_KEY" "$YOUTUBE_CLIENT_ID" "$YOUTUBE_CLIENT_SECRET" \
+          printf 'GEMINI_API_KEY=%s\nYOUTUBE_CLIENT_ID=%s\nYOUTUBE_CLIENT_SECRET=%s\nYOUTUBE_REFRESH_TOKEN=%s\nCHANNEL_NAME=占い動画チャンネル\n' \
+            "$GEMINI_API_KEY" "$YOUTUBE_CLIENT_ID" "$YOUTUBE_CLIENT_SECRET" "$YOUTUBE_REFRESH_TOKEN" \
             > fortune_bot/.env
 
       - name: token.json を作成
