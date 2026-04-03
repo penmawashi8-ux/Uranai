@@ -31,14 +31,14 @@ from moviepy import (
 from config import (
     BACKGROUNDS_DIR,
     BGM_DIR,
+    CARD_CHOICES,
     FONT_BOLD,
     OUTPUT_DIR,
     VIDEO_FPS,
     VIDEO_HEIGHT,
     VIDEO_WIDTH,
-    ZODIAC_LIST,
 )
-from generate_fortune import get_fortune_for_sign, load_fortunes
+from generate_fortune import get_fortune_for_card, load_fortunes
 
 # ---------------------------------------------------------------------------
 # 定数
@@ -203,7 +203,7 @@ def _load_bgm(duration: float) -> AudioFileClip | None:
 # ---------------------------------------------------------------------------
 
 def _make_intro(fortune: dict, bg: ImageClip, color: str) -> CompositeVideoClip:
-    """イントロ（3秒）: 星座名＋絵文字をフェードイン表示。
+    """イントロ（3秒）: カード選択ラベルをフェードイン表示。
 
     Args:
         fortune: 運勢データ。
@@ -214,12 +214,13 @@ def _make_intro(fortune: dict, bg: ImageClip, color: str) -> CompositeVideoClip:
         CompositeVideoClip。
     """
     d = float(SEC_INTRO)
-    emoji_clip = _make_text_clip(fortune["emoji"], 140, color, duration=d)
-    name_clip  = _make_text_clip(fortune["sign"],  80, "white", duration=d)
+    label = fortune.get("card_label", "?")
+    tarot_clip  = _make_text_clip("🃏", 140, color, duration=d)
+    name_clip   = _make_text_clip(f"カード {label} を選んだあなたへ", 60, "white", duration=d)
 
     return CompositeVideoClip([
         bg.with_duration(d),
-        _center_clip(emoji_clip, 0.40).with_effects([vfx.FadeIn(0.6)]),
+        _center_clip(tarot_clip, 0.40).with_effects([vfx.FadeIn(0.6)]),
         _center_clip(name_clip,  0.54).with_effects([vfx.FadeIn(0.9)]),
     ]).with_duration(d)
 
@@ -471,12 +472,12 @@ def generate_video(fortune: dict, slug: str, date: str) -> str:
     Returns:
         出力 MP4 ファイルのパス。
     """
-    sign_name = fortune["sign"]
-    print(f"🎬 {sign_name}の動画を生成中...")
+    card_label = fortune["card_label"]
+    print(f"🎬 カード{card_label}の動画を生成中...")
 
     # アクセントカラー取得
-    zodiac_info = next(z for z in ZODIAC_LIST if z["slug"] == slug)
-    color = zodiac_info["color"]
+    card_info = next(c for c in CARD_CHOICES if c["slug"] == slug)
+    color = card_info["color"]
 
     # 背景を各セクション用に用意（全編同じ画像）
     def bg(d: float) -> ImageClip:
@@ -538,28 +539,26 @@ def _today_jst() -> str:
 
 def main() -> None:
     """コマンドライン引数を解析して動画を生成する。"""
-    parser = argparse.ArgumentParser(description="占い動画生成（MoviePy）")
-    parser.add_argument("--sign", required=True, help="星座名（日本語）例: おひつじ座")
+    parser = argparse.ArgumentParser(description="タロット占い動画生成（MoviePy）")
+    parser.add_argument("--card", required=True, help="カードラベル（例: A）")
     parser.add_argument("--date", default=_today_jst(), help="日付 YYYY-MM-DD（省略時: 今日）")
     args = parser.parse_args()
 
-    # 星座情報を取得
-    zodiac = next((z for z in ZODIAC_LIST if z["name"] == args.sign), None)
-    if zodiac is None:
-        names = ", ".join(z["name"] for z in ZODIAC_LIST)
-        print(f"❌ 星座名が不正です: {args.sign}\n使用可能: {names}")
+    card = next((c for c in CARD_CHOICES if c["label"] == args.card.upper()), None)
+    if card is None:
+        labels = ", ".join(c["label"] for c in CARD_CHOICES)
+        print(f"❌ カードラベルが不正です: {args.card}\n使用可能: {labels}")
         sys.exit(1)
 
-    # 運勢データ取得
-    fortune = get_fortune_for_sign(args.date, args.sign)
+    fortune = get_fortune_for_card(args.date, card["label"])
     if fortune is None:
         print(
-            f"❌ {args.date} の {args.sign} の運勢データが見つかりません。\n"
+            f"❌ {args.date} のカード{card['label']}の運勢データが見つかりません。\n"
             f"先に python generate_fortune.py --date {args.date} を実行してください。"
         )
         sys.exit(1)
 
-    generate_video(fortune, zodiac["slug"], args.date)
+    generate_video(fortune, card["slug"], args.date)
 
 
 if __name__ == "__main__":

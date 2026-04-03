@@ -25,8 +25,8 @@ from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 
-from config import LOGS_DIR, OUTPUT_DIR, ZODIAC_LIST
-from generate_fortune import get_fortune_for_sign
+from config import CARD_CHOICES, LOGS_DIR, OUTPUT_DIR
+from generate_fortune import get_fortune_for_card
 
 load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 
@@ -129,33 +129,20 @@ def build_youtube_client() -> object:
 # ---------------------------------------------------------------------------
 
 def _build_title(fortune: dict, date: str) -> str:
-    """動画タイトルを生成する。
-
-    Args:
-        fortune: 運勢データ。
-        date:    日付文字列（YYYY-MM-DD）。
-
-    Returns:
-        タイトル文字列。
-    """
-    return (
-        f"【{fortune['emoji']}{fortune['sign']}】"
-        f"{fortune['hook']}🔮 {date} #shorts"
-    )
+    """動画タイトルを生成する。"""
+    label = fortune.get("card_label", "?")
+    hook  = fortune.get("hook", "今日のタロット")
+    return f"【カード{label}を選んだあなたへ】{hook}🔮 {date} #shorts"
 
 
 def _build_description(fortune: dict) -> str:
-    """動画説明文を生成する。
-
-    Args:
-        fortune: 運勢データ。
-
-    Returns:
-        説明文文字列。
-    """
-    name = fortune["sign"]
+    """動画説明文を生成する。"""
+    label = fortune.get("card_label", "?")
+    card  = fortune.get("card", "")
+    orient = fortune.get("card_orientation", "")
     return (
-        f"{name}の今日の運勢をお届け！✨\n\n"
+        f"カード{label}を選んだあなたの今日の運勢をお届け！✨\n\n"
+        f"🃏 引いたカード：{card}（{orient}）\n\n"
         f"📊 総合運：{fortune['overall']}\n"
         f"💕 恋愛運：{fortune['love']}\n"
         f"💼 仕事運：{fortune['work']}\n"
@@ -163,25 +150,18 @@ def _build_description(fortune: dict) -> str:
         f"🍀 ラッキーカラー：{fortune['lucky_color']}\n"
         f"🎁 ラッキーアイテム：{fortune['lucky_item']}\n\n"
         "━━━━━━━━━━━━━━\n"
-        "毎朝7時に12星座の運勢を投稿！\n"
+        "毎朝タロット占いを投稿！\n"
         "🔔 チャンネル登録＆通知ONで運命が変わる✨\n"
         "━━━━━━━━━━━━━━\n\n"
-        f"#占い #今日の運勢 #{name} #星座占い #shorts"
+        "#占い #タロット #今日の運勢 #タロット占い #shorts"
     )
 
 
 def _build_tags(fortune: dict) -> list[str]:
-    """タグリストを生成する。
-
-    Args:
-        fortune: 運勢データ。
-
-    Returns:
-        タグ文字列のリスト。
-    """
+    """タグリストを生成する。"""
     return [
-        "占い", "今日の運勢", "星座占い", "shorts",
-        fortune["sign"], "恋愛運", "金運",
+        "占い", "タロット", "今日の運勢", "タロット占い", "shorts",
+        "恋愛運", "金運",
     ]
 
 
@@ -250,24 +230,18 @@ def upload_video(
     print(f"\n  ✅ アップロード完了: https://youtu.be/{video_id}")
 
     # ログに記録
-    _log_upload(fortune["sign"], video_id, date)
+    _log_upload(fortune.get("card_label", "?"), video_id, date)
 
     return video_id
 
 
-def _log_upload(sign: str, video_id: str, date: str) -> None:
-    """アップロード結果をログファイルに記録する。
-
-    Args:
-        sign:     星座名。
-        video_id: YouTube 動画 ID。
-        date:     日付文字列。
-    """
+def _log_upload(card_label: str, video_id: str, date: str) -> None:
+    """アップロード結果をログファイルに記録する。"""
     os.makedirs(LOGS_DIR, exist_ok=True)
     log_path = os.path.join(LOGS_DIR, f"{date}.log")
     timestamp = datetime.now(timezone(timedelta(hours=9))).strftime("%Y-%m-%d %H:%M:%S JST")
     with open(log_path, "a", encoding="utf-8") as f:
-        f.write(f"[{timestamp}] UPLOAD OK  {sign}  video_id={video_id}\n")
+        f.write(f"[{timestamp}] UPLOAD OK  カード{card_label}  video_id={video_id}\n")
 
 
 # ---------------------------------------------------------------------------
@@ -283,7 +257,7 @@ def main() -> None:
     """コマンドライン引数を解析してアップロードを実行する。"""
     parser = argparse.ArgumentParser(description="YouTube Shorts アップロード")
     parser.add_argument("--auth",    action="store_true", help="初回 OAuth2 認証フロー")
-    parser.add_argument("--sign",    help="星座名（日本語）例: おひつじ座")
+    parser.add_argument("--card",    help="カードラベル（例: A）")
     parser.add_argument("--date",    default=_today_jst(), help="日付 YYYY-MM-DD")
     parser.add_argument("--private", action="store_true", help="限定公開（テスト用）")
     args = parser.parse_args()
@@ -294,19 +268,19 @@ def main() -> None:
         print("✅ 認証完了。token.json に保存されました。")
         return
 
-    if not args.sign:
-        parser.error("--sign が必要です（例: --sign おひつじ座）")
+    if not args.card:
+        parser.error("--card が必要です（例: --card A）")
 
-    zodiac = next((z for z in ZODIAC_LIST if z["name"] == args.sign), None)
-    if zodiac is None:
-        names = ", ".join(z["name"] for z in ZODIAC_LIST)
-        print(f"❌ 星座名が不正です: {args.sign}\n使用可能: {names}")
+    card = next((c for c in CARD_CHOICES if c["label"] == args.card.upper()), None)
+    if card is None:
+        labels = ", ".join(c["label"] for c in CARD_CHOICES)
+        print(f"❌ カードラベルが不正です: {args.card}\n使用可能: {labels}")
         sys.exit(1)
 
-    video_path = os.path.join(OUTPUT_DIR, f"{zodiac['slug']}_{args.date}.mp4")
-    fortune    = get_fortune_for_sign(args.date, args.sign)
+    video_path = os.path.join(OUTPUT_DIR, f"{card['slug']}_{args.date}.mp4")
+    fortune    = get_fortune_for_card(args.date, card["label"])
     if fortune is None:
-        print(f"❌ {args.date} の {args.sign} の運勢データが見つかりません。")
+        print(f"❌ {args.date} のカード{card['label']}の運勢データが見つかりません。")
         sys.exit(1)
 
     youtube = build_youtube_client()

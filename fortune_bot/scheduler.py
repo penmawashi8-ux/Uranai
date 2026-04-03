@@ -1,8 +1,8 @@
 """
 scheduler.py - APScheduler で占い動画の生成・アップロードを自動実行する。
 
-毎朝 6:00 JST: 全星座の運勢テキストを一括生成
-毎朝 6:30〜  : 6星座を5分おきにアップロード（奇数日/偶数日で交互）
+毎朝 6:00 JST: 全3カードの運勢テキストを一括生成
+毎朝 6:30〜  : 3カードを5分おきにアップロード
 
 使い方:
     python scheduler.py          # デーモンとして常駐起動
@@ -24,8 +24,8 @@ from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.triggers.cron import CronTrigger
 from dotenv import load_dotenv
 
-from config import LOGS_DIR, ZODIAC_LIST, YOUTUBE_MAX_UPLOADS_PER_DAY
-from generate_fortune import generate_all_fortunes, get_fortune_for_sign
+from config import CARD_CHOICES, LOGS_DIR, YOUTUBE_MAX_UPLOADS_PER_DAY
+from generate_fortune import generate_all_fortunes, get_fortune_for_card
 from generate_video import generate_video
 from upload_youtube import build_youtube_client, upload_video
 
@@ -69,35 +69,14 @@ def _setup_logger(date: str) -> logging.Logger:
 
 
 # ---------------------------------------------------------------------------
-# 奇数日 / 偶数日で6星座ずつ振り分け
 # ---------------------------------------------------------------------------
-
-def _signs_for_today(date: str) -> list[dict]:
-    """今日アップロードする6星座を返す（奇数日 / 偶数日で交互）。
-
-    奇数日: ZODIAC_LIST の前半6星座
-    偶数日: ZODIAC_LIST の後半6星座
-
-    Args:
-        date: 日付文字列（YYYY-MM-DD）。
-
-    Returns:
-        ZODIAC_LIST の6要素のサブリスト。
-    """
-    day = int(date.split("-")[2])
-    half = len(ZODIAC_LIST) // 2  # 6
-    if day % 2 == 1:
-        return ZODIAC_LIST[:half]
-    else:
-        return ZODIAC_LIST[half:]
-
 
 # ---------------------------------------------------------------------------
 # スケジュールジョブ
 # ---------------------------------------------------------------------------
 
 def job_generate_fortunes() -> None:
-    """毎朝 6:00 JST: 全星座の運勢テキストを一括生成する。"""
+    """毎朝 6:00 JST: 全3カードの運勢テキストを一括生成する。"""
     date = datetime.now(JST).strftime("%Y-%m-%d")
     logger = _setup_logger(date)
     logger.info("=== 運勢テキスト生成 開始 ===")
@@ -110,60 +89,41 @@ def job_generate_fortunes() -> None:
 
 def _upload_with_retry(
     youtube,
-    zodiac: dict,
+    card: dict,
     date: str,
     logger: logging.Logger,
     max_retries: int = 3,
     retry_wait: int = 30,
 ) -> bool:
-    """動画生成＋アップロードをリトライ付きで実行する。
-
-    Args:
-        youtube:     YouTube API クライアント。
-        zodiac:      ZODIAC_LIST の1要素。
-        date:        日付文字列（YYYY-MM-DD）。
-        logger:      ロガー。
-        max_retries: 最大リトライ回数。
-        retry_wait:  リトライ待機秒数。
-
-    Returns:
-        成功すれば True、失敗すれば False。
-    """
+    """動画生成＋アップロードをリトライ付きで実行する。"""
     for attempt in range(1, max_retries + 1):
         try:
-            fortune = get_fortune_for_sign(date, zodiac["name"])
+            fortune = get_fortune_for_card(date, card["label"])
             if fortune is None:
-                logger.warning(f"{zodiac['name']}: 運勢データなし（スキップ）")
+                logger.warning(f"カード{card['label']}: 運勢データなし（スキップ）")
                 return False
 
-            # 動画生成
-            video_path = generate_video(fortune, zodiac["slug"], date)
-
-            # アップロード
+            video_path = generate_video(fortune, card["slug"], date)
             video_id = upload_video(youtube, video_path, fortune, date)
-            logger.info(f"{zodiac['name']}: アップロード成功 video_id={video_id}")
+            logger.info(f"カード{card['label']}: アップロード成功 video_id={video_id}")
             return True
 
         except Exception as e:
-            logger.warning(f"{zodiac['name']}: 試行 {attempt}/{max_retries} 失敗: {e}")
+            logger.warning(f"カード{card['label']}: 試行 {attempt}/{max_retries} 失敗: {e}")
             if attempt < max_retries:
                 logger.info(f"  {retry_wait}秒後にリトライします...")
                 time.sleep(retry_wait)
 
-    logger.error(f"{zodiac['name']}: すべてのリトライが失敗しました")
+    logger.error(f"カード{card['label']}: すべてのリトライが失敗しました")
     return False
 
 
-def job_upload_signs() -> None:
-    """毎朝 6:30〜 JST: 今日の6星座を5分おきにアップロードする。
-
-    6星座を逐次処理し、各完了後に5分待機する。
-    """
+def job_upload_cards() -> None:
+    """毎朝 6:30〜 JST: 全3カードを5分おきにアップロードする。"""
     date = datetime.now(JST).strftime("%Y-%m-%d")
     logger = _setup_logger(date)
-    signs = _signs_for_today(date)
 
-    logger.info(f"=== アップロード開始: {[z['name'] for z in signs]} ===")
+    logger.info(f"=== アップロード開始: {[c['name'] for c in CARD_CHOICES]} ===")
 
     try:
         youtube = build_youtube_client()
@@ -174,16 +134,15 @@ def job_upload_signs() -> None:
     success = 0
     failed  = 0
 
-    for i, zodiac in enumerate(signs):
-        logger.info(f"[{i + 1}/{len(signs)}] {zodiac['name']} 処理開始")
-        ok = _upload_with_retry(youtube, zodiac, date, logger)
+    for i, card in enumerate(CARD_CHOICES):
+        logger.info(f"[{i + 1}/{len(CARD_CHOICES)}] カード{card['label']} 処理開始")
+        ok = _upload_with_retry(youtube, card, date, logger)
         if ok:
             success += 1
         else:
             failed += 1
 
-        # 最後の星座以外は5分待機
-        if i < len(signs) - 1:
+        if i < len(CARD_CHOICES) - 1:
             wait_sec = 5 * 60
             logger.info(f"  次のアップロードまで {wait_sec // 60} 分待機...")
             time.sleep(wait_sec)
@@ -210,18 +169,18 @@ def run_scheduler() -> None:
         misfire_grace_time=300,
     )
 
-    # 毎朝 6:30 JST: アップロード（6星座を逐次処理、内部で5分待機）
+    # 毎朝 6:30 JST: アップロード（3カードを逐次処理、内部で5分待機）
     scheduler.add_job(
-        job_upload_signs,
+        job_upload_cards,
         CronTrigger(hour=6, minute=30, timezone=JST),
-        id="upload_signs",
+        id="upload_cards",
         name="動画アップロード",
         misfire_grace_time=300,
     )
 
     print("🕕 スケジューラを起動しました")
-    print("  - 毎朝 06:00 JST: 運勢テキスト生成")
-    print("  - 毎朝 06:30 JST: 動画生成＆アップロード（6星座）")
+    print("  - 毎朝 06:00 JST: タロット占いテキスト生成")
+    print("  - 毎朝 06:30 JST: 動画生成＆アップロード（3カード）")
     print("  Ctrl+C で停止")
 
     try:
@@ -246,7 +205,7 @@ def main() -> None:
 
     if args.once:
         job_generate_fortunes()
-        job_upload_signs()
+        job_upload_cards()
     else:
         run_scheduler()
 

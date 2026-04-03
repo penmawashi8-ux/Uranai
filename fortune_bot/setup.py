@@ -25,7 +25,7 @@ from config import (
     BGM_DIR,
     OUTPUT_DIR,
     LOGS_DIR,
-    ZODIAC_LIST,
+    CARD_CHOICES,
 )
 
 # フォントのダウンロード元
@@ -201,7 +201,7 @@ def _star_draw_args_imagemagick(
     """ImageMagick 用の星描画引数を生成する（random.seed でリプロダクティブ）。
 
     Args:
-        slug:         星座のスラッグ（シード値に使用）。
+        slug:         カードのスラッグ（シード値に使用）。
         color:        アクセントカラー（16進数文字列）。
         white_count:  白い星の数。
         accent_count: アクセントカラーの星の数。
@@ -230,20 +230,20 @@ def _star_draw_args_imagemagick(
     return args
 
 
-def _generate_bg_imagemagick(cmd: str, zodiac: dict) -> None:
-    """ImageMagick で1星座分の背景画像を生成する。
+def _generate_bg_imagemagick(cmd: str, card: dict) -> None:
+    """ImageMagick で1カード分の背景画像を生成する。
 
     Args:
-        cmd:    ImageMagick コマンド名。
-        zodiac: ZODIAC_LIST の1要素。
+        cmd:  ImageMagick コマンド名。
+        card: CARD_CHOICES の1要素。
 
     Raises:
         RuntimeError: コマンドが失敗した場合。
     """
-    slug   = zodiac["slug"]
-    mid    = zodiac["mid"]
-    dark   = zodiac["dark"]
-    color  = zodiac["color"]
+    slug   = card["slug"]
+    mid    = card["mid"]
+    dark   = card["dark"]
+    color  = card["color"]
     output = os.path.join(BACKGROUNDS_DIR, f"{slug}.png")
     tmp    = output + ".tmp.png"
 
@@ -284,20 +284,20 @@ def _generate_bg_imagemagick(cmd: str, zodiac: dict) -> None:
             os.remove(tmp)
 
 
-def _generate_bg_numpy(zodiac: dict) -> None:
+def _generate_bg_numpy(card: dict) -> None:
     """numpy+zlibでPillowを使わずに背景画像を生成する。
 
     Args:
-        zodiac: ZODIAC_LIST の1要素。
+        card: CARD_CHOICES の1要素。
     """
     import struct
     import zlib
     import numpy as np
 
-    slug   = zodiac["slug"]
-    mid    = zodiac["mid"]
-    dark   = zodiac["dark"]
-    color  = zodiac["color"]
+    slug   = card["slug"]
+    mid    = card["mid"]
+    dark   = card["dark"]
+    color  = card["color"]
     output = os.path.join(BACKGROUNDS_DIR, f"{slug}.png")
 
     W, H = 1080, 1920
@@ -360,7 +360,7 @@ def _generate_bg_numpy(zodiac: dict) -> None:
 
 
 def generate_backgrounds(imagemagick_cmd: str | None) -> None:
-    """12星座分の背景画像を生成する。
+    """3カード分の背景画像を生成する。
 
     ImageMagick が使えればそちらを優先し、なければ numpy で生成する（Pillow 不使用）。
 
@@ -370,19 +370,19 @@ def generate_backgrounds(imagemagick_cmd: str | None) -> None:
     if imagemagick_cmd is None:
         print("⚠️  ImageMagick が見つかりません。numpy で生成します（Pillow 不使用）...")
 
-    for zodiac in ZODIAC_LIST:
-        slug   = zodiac["slug"]
+    for card in CARD_CHOICES:
+        slug   = card["slug"]
         output = os.path.join(BACKGROUNDS_DIR, f"{slug}.png")
 
         if os.path.isfile(output):
             print(f"  ⏭️  スキップ（既存）: {slug}.png")
             continue
 
-        print(f"  生成中: {zodiac['name']} ({slug}.png) ...", end=" ", flush=True)
+        print(f"  生成中: {card['name']} ({slug}.png) ...", end=" ", flush=True)
         if imagemagick_cmd:
-            _generate_bg_imagemagick(imagemagick_cmd, zodiac)
+            _generate_bg_imagemagick(imagemagick_cmd, card)
         else:
-            _generate_bg_numpy(zodiac)
+            _generate_bg_numpy(card)
         print("完了")
 
     print("✅ 背景画像の生成が完了しました")
