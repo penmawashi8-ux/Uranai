@@ -6,8 +6,9 @@ __pycache__/
 # 生成物（動画・運勢JSON）
 fortune_bot/output/
 
-# 認証トークン
+# 認証トークン・シークレット
 fortune_bot/token.json
+fortune_bot/.env
 
 # アセット（setup.pyが自動生成）
 fortune_bot/assets/backgrounds/
