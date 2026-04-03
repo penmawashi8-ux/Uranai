@@ -79,18 +79,40 @@ def _build_client_config() -> dict:
     }
 
 
-def get_credentials() -> Credentials:
+def get_credentials(force_reauth: bool = False) -> Credentials:
     """OAuth2 認証情報を取得する。
 
-    token.json が存在すれば読み込み、期限切れなら自動リフレッシュする。
-    存在しない場合は認証フローを起動する（ブラウザが開く）。
+    環境変数 YOUTUBE_REFRESH_TOKEN / YOUTUBE_CLIENT_ID / YOUTUBE_CLIENT_SECRET
+    が揃っていれば直接 Credentials を構築する（GitHub Actions 向け）。
+    それ以外は token.json を読み込み、期限切れなら自動リフレッシュする。
+    force_reauth=True の場合は既存 token.json を無視して OAuth フローを再実行する。
 
     Returns:
         有効な Credentials オブジェクト。
     """
+    # ── 環境変数から直接構築（GitHub Actions / CI 向け） ──────────────────
+    env_refresh  = os.getenv("YOUTUBE_REFRESH_TOKEN", "").strip()
+    env_client_id = os.getenv("YOUTUBE_CLIENT_ID", "").strip()
+    env_secret    = os.getenv("YOUTUBE_CLIENT_SECRET", "").strip()
+
+    if env_refresh and env_client_id and env_secret and not force_reauth:
+        creds = Credentials(
+            token=None,
+            refresh_token=env_refresh,
+            token_uri="https://oauth2.googleapis.com/token",
+            client_id=env_client_id,
+            client_secret=env_secret,
+            scopes=SCOPES,
+        )
+        creds.refresh(Request())
+        with open(TOKEN_PATH, "w") as f:
+            f.write(creds.to_json())
+        return creds
+
+    # ── token.json から読み込み ──────────────────────────────────────────
     creds: Credentials | None = None
 
-    if os.path.isfile(TOKEN_PATH):
+    if not force_reauth and os.path.isfile(TOKEN_PATH):
         creds = Credentials.from_authorized_user_file(TOKEN_PATH, SCOPES)
 
     if not creds or not creds.valid or not creds.token:
@@ -290,8 +312,22 @@ def main() -> None:
 
     if args.auth:
         print("🔑 OAuth2 認証を開始します（ブラウザが開きます）...")
-        get_credentials()
+        # 既存 token.json を削除してから再認証（古い refresh_token が残らないように）
+        if os.path.isfile(TOKEN_PATH):
+            os.remove(TOKEN_PATH)
+            print(f"  既存の token.json を削除しました: {TOKEN_PATH}")
+        get_credentials(force_reauth=True)
         print("✅ 認証完了。token.json に保存されました。")
+        print(f"   refresh_token を GitHub Secrets の YOUTUBE_REFRESH_TOKEN に設定してください。")
+        import json as _json
+        with open(TOKEN_PATH) as _f:
+            _data = _json.load(_f)
+        rt = _data.get("refresh_token", "")
+        cid = _data.get("client_id", "")
+        cs = _data.get("client_secret", "")
+        print(f"\n   YOUTUBE_CLIENT_ID     = {cid}")
+        print(f"   YOUTUBE_CLIENT_SECRET = {cs}")
+        print(f"   YOUTUBE_REFRESH_TOKEN = {rt}")
         return
 
     if not args.sign:
