@@ -24,7 +24,7 @@ from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.triggers.cron import CronTrigger
 from dotenv import load_dotenv
 
-from config import LOGS_DIR, ZODIAC_LIST, YOUTUBE_MAX_UPLOADS_PER_DAY
+from config import LOGS_DIR, ZODIAC_LIST, YOUTUBE_MAX_UPLOADS_PER_DAY, AUTO_POST_ENABLED
 from generate_fortune import generate_all_fortunes, get_fortune_for_sign
 from generate_video import generate_video
 from upload_youtube import build_youtube_client, upload_video
@@ -158,7 +158,14 @@ def job_upload_signs() -> None:
     """毎朝 6:30〜 JST: 今日の6星座を5分おきにアップロードする。
 
     6星座を逐次処理し、各完了後に5分待機する。
+    AUTO_POST_ENABLED が False の場合はスキップする。
     """
+    if not AUTO_POST_ENABLED:
+        date = datetime.now(JST).strftime("%Y-%m-%d")
+        logger = _setup_logger(date)
+        logger.info("AUTO_POST_ENABLED=False のため自動投稿をスキップしました")
+        return
+
     date = datetime.now(JST).strftime("%Y-%m-%d")
     logger = _setup_logger(date)
     signs = _signs_for_today(date)
