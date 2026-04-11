@@ -519,23 +519,17 @@ def generate_video(date: datetime, output_path: str, test_mode: bool = False) ->
 
     print("[INFO] シーン生成中...")
 
-    if test_mode:
-        # テストモード: 簡略版（シーン1のみ）
-        scene1 = make_scene_intro(font, date)
-        video = scene1.subclip(0, 3)
-        print("[INFO] テストモード: シーン1のみ生成")
-    else:
-        scene1 = make_scene_intro(font, date)
-        scene2 = make_scene_select(font, back_arr, card_positions)
-        scene3 = make_scene_flip(font, back_arr, front_arrs, cards, card_positions)
-        scene4 = make_scene_results(font, front_arrs, cards, card_positions)
-        scene5 = make_scene_ending(font)
+    scene1 = make_scene_intro(font, date)
+    scene2 = make_scene_select(font, back_arr, card_positions)
+    scene3 = make_scene_flip(font, back_arr, front_arrs, cards, card_positions)
+    scene4 = make_scene_results(font, front_arrs, cards, card_positions)
+    scene5 = make_scene_ending(font)
 
-        print("[INFO] シーン結合中...")
-        video = concatenate_videoclips(
-            [scene1, scene2, scene3, scene4, scene5],
-            method="compose",
-        )
+    print("[INFO] シーン結合中...")
+    video = concatenate_videoclips(
+        [scene1, scene2, scene3, scene4, scene5],
+        method="compose",
+    )
 
     # 出力先ディレクトリを作成
     os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
@@ -546,7 +540,7 @@ def generate_video(date: datetime, output_path: str, test_mode: bool = False) ->
         fps=FPS,
         codec="libx264",
         audio=False,
-        logger="bar" if not test_mode else None,
+        logger="bar",
         ffmpeg_params=["-crf", "23", "-preset", "medium"],
     )
     print(f"[OK] 完了: {output_path}")
