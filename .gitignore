@@ -2,21 +2,22 @@
 __pycache__/
 *.py[cod]
 *.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
 
-# 生成物（動画・運勢JSON）
-fortune_bot/output/
+# 生成動画（コミットしない）
+output/
 
 # 認証トークン・シークレット
-fortune_bot/token.json
-fortune_bot/.env
+token.json
+.env
+*.credentials.json
 
-# アセット（setup.pyが自動生成）
-fortune_bot/assets/backgrounds/
-fortune_bot/assets/fonts/
-
-# BGM（著作権フリー素材は各自で配置）
-fortune_bot/assets/bgm/*.mp3
-fortune_bot/assets/bgm/*.wav
-
-# BGMフォルダのREADMEは追跡する
-!fortune_bot/assets/bgm/README.txt
+# OS
+.DS_Store
+Thumbs.db

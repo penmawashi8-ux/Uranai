@@ -1,0 +1,76 @@
+name: Generate Daily Fortune Video
+
+on:
+  schedule:
+    - cron: '0 21 * * *'   # 毎日 JST 06:00（UTC 21:00）
+  workflow_dispatch:          # 手動実行も可能
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y \
+            fonts-noto-cjk \
+            ffmpeg \
+            imagemagick \
+            libmagickwand-dev
+
+      - name: Fix ImageMagick policy (allow text rendering)
+        run: |
+          POLICY=/etc/ImageMagick-6/policy.xml
+          if [ -f "$POLICY" ]; then
+            sudo python3 -c "
+import sys
+content = open('$POLICY').read()
+content = content.replace(
+    'rights=\"none\" pattern=\"@*\"',
+    'rights=\"read|write\" pattern=\"@*\"'
+)
+content = content.replace(
+    'rights=\"none\" pattern=\"PDF\"',
+    'rights=\"read|write\" pattern=\"PDF\"'
+)
+open('$POLICY', 'w').write(content)
+print('ImageMagick policy updated')
+"
+          fi
+
+      - name: Install Python dependencies
+        run: |
+          pip install --upgrade pip
+          pip install "setuptools<60" wheel
+          pip install -r requirements.txt
+
+      - name: Verify font availability
+        run: |
+          echo "=== Available Japanese fonts ==="
+          fc-list :lang=ja | head -10
+          echo "================================"
+
+      - name: Generate fortune video
+        run: python generate_video.py
+
+      - name: Upload video as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: fortune-video-${{ github.run_number }}
+          path: output/*.mp4
+          retention-days: 7
+
+      - name: Show output info
+        if: always()
+        run: |
+          echo "=== Output files ==="
+          ls -lh output/ 2>/dev/null || echo "(no output directory)"
