@@ -265,19 +265,20 @@ def make_scene_select(
 
     clips: list = [bg, prompt]
 
-    # カード3枚をフェードインで表示
+    # カード3枚をフェードインで表示（シーン終了まで維持）
     for i, (px, py) in enumerate(card_positions):
         fade_delay = 0.4 + i * 0.3
+        remaining = dur - fade_delay
         card_clip = (
             ImageClip(back_arr)
-            .set_duration(dur)
+            .set_duration(remaining)
             .set_position((px, py))
             .crossfadein(0.4)
             .set_start(fade_delay)
         )
         clips.append(card_clip)
 
-    return CompositeVideoClip(clips, size=(VIDEO_WIDTH, VIDEO_HEIGHT))
+    return CompositeVideoClip(clips, size=(VIDEO_WIDTH, VIDEO_HEIGHT), use_bgclip=True)
 
 
 def make_scene_flip(
@@ -293,23 +294,26 @@ def make_scene_flip(
 
     clips: list = [bg]
 
-    # 各カードのフリップタイミング（相対時刻）
-    flip_starts = [0.0, 3.5, 7.0]  # 8s, 11.5s, 15s (絶対時刻)
-    flip_dur = 2.0
-    hold_start = 10.0  # フリップ終了後のホールド開始（シーン内相対）
+    # フリップタイミング：最初に全カードを表示してから順番にめくる
+    pre_show = 1.5            # 全カード裏向き表示時間
+    flip_dur = 2.0            # 1枚あたりのフリップ時間
+    flip_starts = [
+        pre_show,
+        pre_show + flip_dur + 0.3,
+        pre_show + (flip_dur + 0.3) * 2,
+    ]  # 1.5s, 4.1s, 6.7s
 
     for i, (px, py) in enumerate(card_positions):
         fs = flip_starts[i]
 
-        # フリップ前：裏面を表示
-        if fs > 0:
-            pre_back = (
-                ImageClip(back_arr)
-                .set_duration(fs)
-                .set_start(0)
-                .set_position((px, py))
-            )
-            clips.append(pre_back)
+        # フリップ前：裏面を表示（最初から fs 秒まで）
+        pre_back = (
+            ImageClip(back_arr)
+            .set_duration(fs)
+            .set_start(0)
+            .set_position((px, py))
+        )
+        clips.append(pre_back)
 
         # フリップアニメーション
         flip = (
@@ -319,7 +323,7 @@ def make_scene_flip(
         )
         clips.append(flip)
 
-        # フリップ後：表面を表示してカード番号を重ねる
+        # フリップ後：表面を表示してカードタイトルを重ねる
         post_start = fs + flip_dur
         post_dur = dur - post_start
         if post_dur > 0:
@@ -331,7 +335,6 @@ def make_scene_flip(
             )
             clips.append(post_front)
 
-            # カードタイトル
             card_title_clip = make_text_clip(
                 cards[i]["title"],
                 fontsize=36,
@@ -342,18 +345,18 @@ def make_scene_flip(
             ).set_start(post_start).set_position((px, py + CARD_H + 5))
             clips.append(card_title_clip)
 
-    # 「カードが語りかけています」テキスト（フリップ後半）
-    info_start = flip_starts[2] + flip_dur
-    info_dur = dur - info_start
+    # 全カード開封後のテキスト
+    all_done = flip_starts[2] + flip_dur
+    info_dur = dur - all_done
     if info_dur > 0:
         info = make_text_clip(
-            "カードのメッセージを\n受け取りましょう",
+            "3枚のカードが届きました",
             fontsize=44,
             color=COLOR_WHITE,
             font=font,
             duration=info_dur,
             size=(VIDEO_WIDTH - 80, None),
-        ).set_start(info_start).set_position(("center", 680))
+        ).set_start(all_done).set_position(("center", 680))
         clips.append(info)
 
     return CompositeVideoClip(clips, size=(VIDEO_WIDTH, VIDEO_HEIGHT))
@@ -382,62 +385,94 @@ def make_scene_results(
     ).set_position(("center", 120))
     clips.append(header)
 
-    # カード縦並び表示（小さめのサイズで）
-    small_w, small_h = 160, 256
-    card_x_start = (VIDEO_WIDTH - small_w) // 2
-    card_y_positions = [260, 620, 980]
-
-    rank_labels = {1: "🥇 1位", 2: "🥈 2位", 3: "🥉 3位"}
+    # カード：横レイアウト（左=画像、右=ランク+メッセージ）
+    # 3カードを縦に並べる（各セクション = 570px）
+    small_w, small_h = 130, 208   # カード画像サイズ
+    section_h = 570               # 1カードあたりの高さ
+    img_x = 60                    # 画像の左端X
+    text_x = img_x + small_w + 30 # テキスト開始X
+    text_w = VIDEO_WIDTH - text_x - 30  # テキスト幅
 
     for i, card in enumerate(cards):
-        # cards はランク順（1位から）
-        py = card_y_positions[i]
-        px = card_x_start
+        section_y = 130 + i * section_h
+        fade_delay = i * 0.4
 
-        # カード画像をリサイズ
+        # カード画像リサイズ
         arr = front_arrs[i]
         x_src = np.linspace(0, arr.shape[1] - 1, small_w).astype(int)
         y_src = np.linspace(0, arr.shape[0] - 1, small_h).astype(int)
         small_arr = arr[np.ix_(y_src, x_src)]
 
-        fade_in_delay = i * 0.5
+        img_y = section_y + 20
         card_clip = (
             ImageClip(small_arr)
-            .set_duration(dur - fade_in_delay)
-            .set_start(fade_in_delay)
+            .set_duration(dur - fade_delay)
+            .set_start(fade_delay)
             .crossfadein(0.3)
-            .set_position((px, py))
+            .set_position((img_x, img_y))
         )
         clips.append(card_clip)
 
-        # ランクラベル
+        # ランク + タイトル（画像の右）
         rank_color = COLOR_LIGHT_GOLD if card["rank"] == 1 else COLOR_GOLD
         rank_clip = make_text_clip(
-            f"第{card['rank']}位  {card['title']}",
-            fontsize=40,
+            f"第{card['rank']}位　{card['title']}",
+            fontsize=44,
             color=rank_color,
             font=font,
-            duration=dur - fade_in_delay,
-            size=(VIDEO_WIDTH - 60, None),
-        ).set_start(fade_in_delay).crossfadein(0.3).set_position(
-            ("center", py - 38)
-        )
+            duration=dur - fade_delay,
+            size=(text_w, None),
+        ).set_start(fade_delay).crossfadein(0.3).set_position((text_x, section_y + 20))
         clips.append(rank_clip)
 
-        # メッセージテキスト
+        # メッセージ3行（ランクラベルの下）
         msg_lines = card["message"].split("\n")
         for j, line in enumerate(msg_lines):
             msg_clip = make_text_clip(
                 line,
-                fontsize=30,
+                fontsize=32,
                 color=COLOR_WHITE,
                 font=font,
-                duration=dur - fade_in_delay,
-                size=(VIDEO_WIDTH - 60, None),
-            ).set_start(fade_in_delay).crossfadein(0.3).set_position(
-                ("center", py + small_h + 5 + j * 34)
+                duration=dur - fade_delay,
+                size=(text_w, None),
+            ).set_start(fade_delay).crossfadein(0.3).set_position(
+                (text_x, section_y + 80 + j * 42)
             )
             clips.append(msg_clip)
+
+        # ラッキーカラー・アイテム
+        lucky_y = section_y + 80 + len(msg_lines) * 42 + 18
+        lucky_color_clip = make_text_clip(
+            f"ラッキーカラー：{card['lucky_color']}",
+            fontsize=28,
+            color=COLOR_GOLD,
+            font=font,
+            duration=dur - fade_delay,
+            size=(text_w, None),
+        ).set_start(fade_delay).crossfadein(0.3).set_position((text_x, lucky_y))
+        clips.append(lucky_color_clip)
+
+        lucky_item_clip = make_text_clip(
+            f"ラッキーアイテム：{card['lucky_item']}",
+            fontsize=28,
+            color=COLOR_GOLD,
+            font=font,
+            duration=dur - fade_delay,
+            size=(text_w, None),
+        ).set_start(fade_delay).crossfadein(0.3).set_position((text_x, lucky_y + 38))
+        clips.append(lucky_item_clip)
+
+        # 区切り線（最終カード以外）
+        if i < 2:
+            sep_y = section_y + section_h - 10
+            sep_arr = np.full((3, VIDEO_WIDTH - 80, 3), (80, 60, 120), dtype=np.uint8)
+            sep_clip = (
+                ImageClip(sep_arr)
+                .set_duration(dur - fade_delay)
+                .set_start(fade_delay)
+                .set_position((40, sep_y))
+            )
+            clips.append(sep_clip)
 
     return CompositeVideoClip(clips, size=(VIDEO_WIDTH, VIDEO_HEIGHT))
 
@@ -500,7 +535,7 @@ def generate_video(date: datetime, output_path: str, test_mode: bool = False) ->
     cards = get_fortune_cards(date)
     print("[INFO] カード:")
     for c in cards:
-        print(f"  {c['rank']}位: {c['title']} ({c['symbol']})")
+        print(f"  {c['rank']}位: {c['title']} ({c['symbol']}) / カラー:{c['lucky_color']} / アイテム:{c['lucky_item']}")
 
     # カード画像生成
     back_arr = generate_card_back(CARD_W, CARD_H)
