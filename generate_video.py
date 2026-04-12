@@ -27,9 +27,9 @@ try:
         ImageClip,
         TextClip,
         VideoClip,
+        AudioFileClip,
         concatenate_videoclips,
     )
-    from moviepy.audio.AudioClip import AudioArrayClip
     import moviepy.config as mpy_config
 
     # ImageMagick のパスを MoviePy に設定
@@ -43,7 +43,6 @@ except ImportError as e:
 
 from fortune_content import get_fortune_cards, get_date_string
 from card_generator import generate_card_back, generate_card_front
-from generate_bgm import make_bgm
 
 # ---------------------------------------------------------------------------
 # 定数
@@ -592,23 +591,36 @@ def generate_video(date: datetime, output_path: str, test_mode: bool = False) ->
         method="compose",
     )
 
-    # BGM 生成・合成
-    print("[INFO] BGM生成中...")
-    bgm_arr, bgm_name = make_bgm(duration=video.duration, date=date)
-    audio_clip = AudioArrayClip(bgm_arr, fps=44100).set_duration(video.duration)
-    video = video.set_audio(audio_clip)
+    # BGM 合成（bgm.mp3 が存在する場合のみ）
+    BGM_FILE = "bgm.mp3"
+    has_audio = False
+    if os.path.exists(BGM_FILE):
+        try:
+            print(f"[INFO] BGM読み込み: {BGM_FILE}")
+            bgm = (
+                AudioFileClip(BGM_FILE)
+                .set_duration(video.duration)
+                .audio_fadein(2.0)
+                .audio_fadeout(3.0)
+            )
+            video = video.set_audio(bgm)
+            has_audio = True
+        except Exception as e:
+            print(f"[WARN] BGM読み込み失敗（スキップ）: {e}", file=sys.stderr)
+    else:
+        print(f"[INFO] BGMなし（{BGM_FILE} が見つかりません）")
 
     # 出力先ディレクトリを作成
     os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
 
-    print(f"[INFO] 動画書き出し中（BGM: {bgm_name}）...")
+    print("[INFO] 動画書き出し中（しばらくかかります）...")
     video.write_videofile(
         output_path,
         fps=FPS,
         codec="libx264",
-        audio=True,
-        audio_codec="aac",
-        audio_fps=44100,
+        audio=has_audio,
+        audio_codec="aac" if has_audio else None,
+        audio_fps=44100 if has_audio else None,
         logger="bar",
         ffmpeg_params=["-crf", "23", "-preset", "medium"],
     )
