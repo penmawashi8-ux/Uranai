@@ -29,6 +29,7 @@ try:
         VideoClip,
         concatenate_videoclips,
     )
+    from moviepy.audio.AudioClip import AudioArrayClip
     import moviepy.config as mpy_config
 
     # ImageMagick のパスを MoviePy に設定
@@ -42,6 +43,7 @@ except ImportError as e:
 
 from fortune_content import get_fortune_cards, get_date_string
 from card_generator import generate_card_back, generate_card_front
+from generate_bgm import make_bgm
 
 # ---------------------------------------------------------------------------
 # 定数
@@ -590,15 +592,23 @@ def generate_video(date: datetime, output_path: str, test_mode: bool = False) ->
         method="compose",
     )
 
+    # BGM 生成・合成
+    print("[INFO] BGM生成中...")
+    bgm_arr, bgm_name = make_bgm(duration=video.duration, date=date)
+    audio_clip = AudioArrayClip(bgm_arr, fps=44100).set_duration(video.duration)
+    video = video.set_audio(audio_clip)
+
     # 出力先ディレクトリを作成
     os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
 
-    print("[INFO] 動画書き出し中（しばらくかかります）...")
+    print(f"[INFO] 動画書き出し中（BGM: {bgm_name}）...")
     video.write_videofile(
         output_path,
         fps=FPS,
         codec="libx264",
-        audio=False,
+        audio=True,
+        audio_codec="aac",
+        audio_fps=44100,
         logger="bar",
         ffmpeg_params=["-crf", "23", "-preset", "medium"],
     )
