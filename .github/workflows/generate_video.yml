@@ -55,11 +55,13 @@ jobs:
           pip install "setuptools>=44,<60" wheel
           pip install moviepy==1.0.3
           pip install "requests>=2.28.0"
+          # YouTube API
+          pip install google-api-python-client google-auth
 
       - name: Verify environment
         run: |
           echo "=== Python packages ==="
-          pip list | grep -E "moviepy|numpy|setuptools"
+          pip list | grep -E "moviepy|numpy|setuptools|google"
           echo "=== Available Japanese fonts ==="
           fc-list :lang=ja | head -10
           echo "=== ImageMagick version ==="
@@ -67,9 +69,22 @@ jobs:
           echo "================================"
 
       - name: Generate fortune video
-        run: python generate_video.py
+        run: |
+          DATE=$(date +%Y%m%d)
+          python generate_video.py
+          echo "VIDEO_PATH=output/fortune_${DATE}.mp4" >> $GITHUB_ENV
+          echo "VIDEO_DATE=${DATE}" >> $GITHUB_ENV
 
-      - name: Upload video as artifact
+      - name: Upload to YouTube Shorts
+        env:
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+        run: |
+          python upload_youtube.py "${{ env.VIDEO_PATH }}" --date "${{ env.VIDEO_DATE }}"
+
+      - name: Upload video as artifact (バックアップ)
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: fortune-video-${{ github.run_number }}
