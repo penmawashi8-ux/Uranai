@@ -76,6 +76,7 @@ jobs:
           echo "VIDEO_DATE=${DATE}" >> $GITHUB_ENV
 
       - name: Upload to YouTube Shorts
+        if: false   # 自動投稿オフ（有効化するには if: false を削除）
         env:
           YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
           YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
