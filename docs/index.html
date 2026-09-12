@@ -381,7 +381,7 @@
       <div class="list" id="ok-list"></div>
 
       <details class="out-box" id="ng-box">
-        <summary>サイズ・重さで送れないもの <span id="ng-count"></span></summary>
+        <summary>この荷物では使えないもの <span id="ng-count"></span></summary>
         <div class="list" id="ng-list"></div>
       </details>
 
@@ -425,13 +425,15 @@
       id: "teikeigai-in", name: "定形外郵便（規格内）", brand: "日本郵便", dot: "post", group: "post",
       fit: [{ maxLong: 34, maxShort: 25, maxThick: 3, minLong: 14, minShort: 9 }], maxWeight: 1000,
       fee: { type: "weight", tiers: [[50, 140], [100, 180], [150, 270], [250, 320], [500, 510], [1000, 750]] },
-      tags: ["ポスト投函"], note: "追跡・補償なし。オプションで特定記録（+210円）を付けられます。"
+      supersededBy: { by: "定形郵便", fit: { maxLong: 23.5, maxShort: 12, maxThick: 1 }, maxWeight: 50 },
+      tags: ["ポスト投函"], note: "定形郵便に収まらない郵便物のうち、34×25×3cm・1kg以内のもの。追跡・補償なし。"
     },
     {
       id: "teikeigai-out", name: "定形外郵便（規格外）", brand: "日本郵便", dot: "post", group: "post",
       fit: [{ maxLong: 60, maxSum: 90, minLong: 14, minShort: 9 }], maxWeight: 4000,
       fee: { type: "weight", tiers: [[50, 260], [100, 290], [150, 390], [250, 450], [500, 660], [1000, 920], [2000, 1350], [4000, 1750]] },
-      tags: [], note: "規格内（34×25×3cm）を超える郵便物。追跡・補償なし。"
+      supersededBy: { by: "規格内", fit: { maxLong: 34, maxShort: 25, maxThick: 3 }, maxWeight: 1000 },
+      tags: [], note: "規格内（34×25×3cm・1kg以内）に収まらない郵便物に適用されます。追跡・補償なし。"
     },
     {
       id: "yumail", name: "ゆうメール（規格内）", brand: "日本郵便", dot: "post", group: "post",
@@ -520,8 +522,8 @@
     {
       id: "compact", name: "宅急便コンパクト", brand: "らくらくメルカリ便", dot: "yamato", group: "mercari",
       fit: [
-        { maxLong: 25, maxShort: 20, maxThick: 5 },
-        { maxLong: 34, maxShort: 24.8, maxThick: 1 }
+        { name: "専用BOX", maxLong: 25, maxShort: 20, maxThick: 5 },
+        { name: "薄型BOX", maxLong: 34, maxShort: 24.8, maxThick: 1 }
       ], maxWeight: 25000,
       fee: { type: "flat", value: 450 }, material: { label: "専用BOX", price: 70 },
       tags: ["追跡", "補償", "匿名配送", "コンビニ発送", "集荷可"],
@@ -650,15 +652,19 @@
     return null;
   }
 
-  function limitText(m) {
-    var f = m.fit[0], parts = [];
+  function fitText(f) {
+    var parts = [];
     if (f.maxLong != null && f.maxShort != null) parts.push(fmtCm(f.maxLong) + "×" + fmtCm(f.maxShort) + (f.maxThick != null ? "×" + fmtCm(f.maxThick) : "") + "cm");
     else {
       if (f.maxLong != null) parts.push("最長辺" + fmtCm(f.maxLong) + "cm");
       if (f.maxSum != null) parts.push("3辺計" + fmtCm(f.maxSum) + "cm");
       if (f.maxThick != null) parts.push("厚さ" + fmtCm(f.maxThick) + "cm");
     }
-    if (m.fit.length > 1) parts.push("ほか" + (m.fit.length - 1) + "種の箱");
+    return (f.name ? f.name + " " : "") + parts.join(" / ");
+  }
+
+  function limitText(m) {
+    var parts = m.fit.map(fitText);
     if (m.maxWeight != null && m.maxWeight < 100000) parts.push(gram(m.maxWeight) + "まで");
     return parts.join(" / ");
   }
@@ -691,14 +697,24 @@
       }
       if (dim.S === 0 || weight === 0) return;
 
+      // 上位の区分（定形郵便・規格内）に収まる荷物には、この区分の料金は適用されない
+      if (m.supersededBy) {
+        var sup = checkFit(m.supersededBy.fit, dim, weight, m.supersededBy.maxWeight);
+        if (!sup.fails.length) { ng.push({ m: m, why: m.supersededBy.by + "の料金が適用されます" }); return; }
+      }
+
       // 複数の箱候補のうち、失敗数が最も少ないものを採用
       var best = null;
       m.fit.forEach(function (f) {
         var r = checkFit(f, dim, weight, m.maxWeight);
+        r.name = f.name || "";
         if (!best || r.fails.length < best.fails.length) best = r;
       });
 
-      if (best.fails.length) { ng.push({ m: m, why: best.fails[0] }); return; }
+      if (best.fails.length) {
+        ng.push({ m: m, why: (best.name ? best.name + "：" : "") + best.fails[0] });
+        return;
+      }
 
       var p = priceOf(m, dim, weight);
       if (!p) { ng.push({ m: m, why: "料金区分の範囲外" }); return; }
