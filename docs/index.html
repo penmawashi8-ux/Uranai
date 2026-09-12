@@ -164,6 +164,19 @@
     border-top: 1px dashed var(--line); padding-top: 12px; margin: 0;
   }
 
+  /* ---------- 改定のお知らせ ---------- */
+  .banner {
+    margin: 0 0 18px; padding: 11px 14px; font-size: 12.5px; line-height: 1.7;
+    background: var(--warn-soft); color: var(--ink);
+    border: 1px solid var(--line); border-left: 3px solid var(--warn);
+    border-radius: 4px;
+  }
+  .banner strong { font-weight: 700; color: var(--warn); }
+  .banner.on {
+    background: var(--accent-soft); border-left-color: var(--accent);
+  }
+  .banner.on strong { color: var(--accent-ink); }
+
   /* ---------- metrics ---------- */
   .metrics {
     display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px;
@@ -220,6 +233,7 @@
   .flag.best { background: var(--accent); color: #fff; }
   .flag.tight { background: var(--warn-soft); color: var(--warn); border: 1px solid currentColor; }
   .flag.limit { background: var(--surface-2); color: var(--ink-2); border: 1px solid var(--line); }
+  .flag.rev { background: var(--warn-soft); color: var(--warn); border: 1px solid currentColor; }
 
   .spec {
     font: 400 11.5px/1.6 "Roboto Mono", ui-monospace, monospace;
@@ -286,6 +300,14 @@
     <div class="panel-outer">
       <form class="panel" id="form" autocomplete="off" onsubmit="return false;">
         <div>
+          <span class="field-label">適用する料金</span>
+          <div class="seg" id="rates" role="group" aria-label="適用する料金">
+            <button type="button" data-rate="now" aria-pressed="true">現在</button>
+            <button type="button" data-rate="after" aria-pressed="false">2026/10/1〜</button>
+          </div>
+        </div>
+
+        <div>
           <span class="field-label">荷物のサイズ（外寸）</span>
           <div class="dims">
             <label class="cell">
@@ -340,6 +362,11 @@
 
     <!-- ===== 結果 ===== -->
     <main>
+      <p class="banner" id="banner">
+        <strong>2026年10月1日</strong> に日本郵便が運賃を改定します。クリックポストは185円→<strong>240円</strong>（2kgまでに拡大）、
+        ゆうパケットは厚さ別料金を廃止して<strong>一律360円</strong>。「適用する料金」を切り替えると新料金で比較できます。
+      </p>
+
       <dl class="metrics" id="metrics">
         <div class="metric"><dt>3辺合計</dt><dd id="m-sum">45.0<span class="u">cm</span></dd></div>
         <div class="metric"><dt>最長辺</dt><dd id="m-long">24.0<span class="u">cm</span></dd></div>
@@ -359,12 +386,14 @@
       </details>
 
       <footer class="fine">
-        <strong>料金について</strong>
+        <strong>料金の基準（2026年9月時点）</strong>
         <ul>
-          <li>郵便料金は2024年10月1日改定後の金額、メルカリ便は全国一律の販売手数料とは別の送料です。実際の料金・規格は必ず各社の公式情報で確認してください。</li>
-          <li>メルカリ便はメルカリでの取引が前提です。ゆうパケットポスト・ネコポス等の資材代（シール5円・専用箱65円・専用BOX70円・専用封筒20円）は合計金額に含めています。</li>
-          <li>メルカリ便以外の通常の宅急便・ゆうパックは距離で料金が変わるため、ここには含めていません。</li>
-          <li>ゆうメールは書籍・CD・DVDなどの印刷物・電磁的記録媒体に限られます。</li>
+          <li>定形・定形外郵便は2024年10月1日改定後、ゆうメールは2025年11月1日改定後、ネコポスのサイズは2025年11月10日拡大後の内容です。</li>
+          <li>2026年10月1日の日本郵便の運賃改定（クリックポスト240円・ゆうパケット一律360円）は「適用する料金」で切り替えられます。レターパック・スマートレター・定形郵便・定形外郵便は今回の改定対象外です。</li>
+          <li>メルカリ便はメルカリでの取引が前提で、販売手数料とは別の送料です。資材代（発送用シール5円・専用箱65円・専用BOX70円・専用封筒20円）は合計金額に含めています。</li>
+          <li>メルカリ便以外の通常の宅急便・ゆうパックは距離で料金が変わるため、ここには含めていません（通常のゆうパックも2026年10月1日に平均約10%値上げされます）。</li>
+          <li>ゆうメールは書籍・CD・DVDなどの印刷物・電磁的記録媒体に限られます。らくらくメルカリ便の宅急便180・200サイズは、ヤマト運輸の営業所持ち込みか集荷のみです。</li>
+          <li>実際の料金・規格は必ず各社の公式情報で最終確認してください。</li>
         </ul>
       </footer>
     </main>
@@ -407,7 +436,7 @@
     {
       id: "yumail", name: "ゆうメール（規格内）", brand: "日本郵便", dot: "post", group: "post",
       fit: [{ maxLong: 34, maxShort: 25, maxThick: 3 }], maxWeight: 1000,
-      fee: { type: "weight", tiers: [[150, 180], [250, 215], [500, 310], [1000, 360]] },
+      fee: { type: "weight", tiers: [[150, 190], [250, 230], [500, 320], [1000, 380]] },
       tags: ["ポスト投函"], restricted: "内容物に制限",
       note: "書籍・CD・DVDなどの印刷物専用。中身を確認できる状態にして差し出します。"
     },
@@ -457,10 +486,10 @@
     },
     {
       id: "yupacket-post-mini", name: "ゆうパケットポストmini", brand: "ゆうゆうメルカリ便", dot: "post", group: "mercari",
-      fit: [{ maxLong: 22.8, maxShort: 21.6, maxThick: 3 }], maxWeight: 2000,
+      fit: [{ maxLong: 21.6, maxShort: 17.8, maxThick: 3 }], maxWeight: 2000,
       fee: { type: "flat", value: 160 }, material: { label: "専用封筒", price: 20 },
       tags: ["追跡", "補償", "匿名配送", "ポスト投函"],
-      note: "専用封筒（21.6×22.8cm・20円）に入る小物向け。メルカリ便で最安クラス。"
+      note: "専用封筒（外寸21.6×17.8cm・内寸21.1×16.8cm・20円）に入る小物向け。A5がちょうど収まります。"
     },
     {
       id: "yupacket-mercari", name: "ゆうパケット", brand: "ゆうゆうメルカリ便", dot: "post", group: "mercari",
@@ -484,9 +513,9 @@
     },
     {
       id: "nekopos", name: "ネコポス", brand: "らくらくメルカリ便", dot: "yamato", group: "mercari",
-      fit: [{ maxLong: 31.2, maxShort: 22.8, maxThick: 3, minLong: 23, minShort: 11.5 }], maxWeight: 1000,
+      fit: [{ maxLong: 34, maxSum: 60, maxThick: 3, minLong: 23, minShort: 11.5 }], maxWeight: 1000,
       fee: { type: "flat", value: 210 }, tags: ["追跡", "補償", "匿名配送", "ポスト投函"],
-      note: "角形A4（31.2×22.8cm）以内。最小23×11.5cmの下限があります。"
+      note: "2025年11月10日にサイズ拡大（旧：角形A4 31.2×22.8cm）。最小23×11.5cmの下限があります。"
     },
     {
       id: "compact", name: "宅急便コンパクト", brand: "らくらくメルカリ便", dot: "yamato", group: "mercari",
@@ -522,6 +551,21 @@
     }
   ];
 
+  // ===== 2026年10月1日 日本郵便 運賃改定の上書き =====
+  // レターパック・スマートレター・定形郵便・定形外郵便は今回の改定対象外
+  var REVISION_2026_10 = {
+    clickpost: {
+      fit: [{ maxLong: 34, maxSum: 60, maxThick: 3, minLong: 14, minShort: 9 }], maxWeight: 2000,
+      fee: { type: "flat", value: 240 },
+      note: "2026年10月1日改定で185円→240円、2kgまでに拡大。差出はポスト投函のみ（窓口差出は廃止）。"
+    },
+    yupacket: {
+      fit: [{ maxLong: 34, maxSum: 60, maxThick: 3, minLong: 14 }],
+      fee: { type: "flat", value: 360 },
+      note: "2026年10月1日改定で厚さ別料金を廃止し一律360円。郵便ポストに投函できる厚さ（目安3cm）が必要です。"
+    }
+  };
+
   var PRESETS = [
     { label: "アクセサリー", d: [10, 7, 1], w: 30 },
     { label: "スマホケース", d: [16, 9, 2], w: 80 },
@@ -533,7 +577,16 @@
   ];
 
   // ===== 状態 =====
-  var state = { group: "all", tags: [] };
+  var state = { group: "all", tags: [], rate: "now" };
+
+  // 改定後モードのときだけ、該当する発送方法の内容を差し替える
+  function applyRate(m) {
+    if (state.rate !== "after" || !REVISION_2026_10[m.id]) return m;
+    var over = REVISION_2026_10[m.id], merged = {}, k;
+    for (k in m) if (Object.prototype.hasOwnProperty.call(m, k)) merged[k] = m[k];
+    for (k in over) if (Object.prototype.hasOwnProperty.call(over, k)) merged[k] = over[k];
+    return merged;
+  }
 
   var $ = function (id) { return document.getElementById(id); };
   var els = {
@@ -630,7 +683,8 @@
 
     var ok = [], ng = [];
 
-    METHODS.forEach(function (m) {
+    METHODS.forEach(function (base) {
+      var m = applyRate(base);
       if (state.group !== "all" && m.group !== state.group) return;
       for (var t = 0; t < state.tags.length; t++) {
         if (m.tags.indexOf(state.tags[t]) < 0) return;
@@ -665,6 +719,7 @@
         var m = r.m;
         var flags = "";
         if (i === 0) flags += '<span class="flag best">最安</span>';
+        if (state.rate === "after" && REVISION_2026_10[m.id]) flags += '<span class="flag rev">新運賃</span>';
         if (r.tight >= 0.92) flags += '<span class="flag tight">ぎりぎり</span>';
         if (m.restricted) flags += '<span class="flag limit">' + esc(m.restricted) + "</span>";
         var brk = [];
@@ -714,6 +769,22 @@
     var p = PRESETS[+b.dataset.i];
     els.d[0].value = p.d[0]; els.d[1].value = p.d[1]; els.d[2].value = p.d[2];
     els.w.value = p.w;
+    render();
+  });
+
+  $("rates").addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-rate]"); if (!b) return;
+    state.rate = b.dataset.rate;
+    Array.prototype.forEach.call(this.querySelectorAll("button"), function (x) {
+      x.setAttribute("aria-pressed", String(x === b));
+    });
+    var bn = $("banner");
+    bn.className = state.rate === "after" ? "banner on" : "banner";
+    bn.innerHTML = state.rate === "after"
+      ? '<strong>2026年10月1日以降</strong>の新運賃で計算しています。クリックポスト240円（2kgまで・ポスト投函のみ）、ゆうパケット一律360円。' +
+        'レターパック・スマートレター・定形郵便・定形外郵便は今回の改定対象外です。'
+      : '<strong>2026年10月1日</strong> に日本郵便が運賃を改定します。クリックポストは185円→<strong>240円</strong>（2kgまでに拡大）、' +
+        'ゆうパケットは厚さ別料金を廃止して<strong>一律360円</strong>。「適用する料金」を切り替えると新料金で比較できます。';
     render();
   });
 
