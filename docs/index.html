@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- ARTIFACT-BODY-START -->
+<title>送料くらべ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700;900&family=Roboto+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --ground:        #e9edee;
+    --surface:       #ffffff;
+    --surface-2:     #f3f6f6;
+    --ink:           #12191d;
+    --ink-2:         #4d5b62;
+    --ink-3:         #7b8a91;
+    --line:          #d2dadd;
+    --line-strong:   #b6c1c6;
+    --accent:        #c1362b;
+    --accent-ink:    #a32a21;
+    --accent-soft:   #fbeae7;
+    --ok:            #1c7554;
+    --warn:          #9a5f13;
+    --warn-soft:     #f8efdf;
+    --dot-post:      #c1362b;
+    --dot-yamato:    #1f7a3f;
+    --shadow:        0 1px 2px rgba(18,25,29,.06), 0 8px 24px -16px rgba(18,25,29,.35);
+    --radius:        10px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:      #11161a;
+      --surface:     #1a2126;
+      --surface-2:   #212a30;
+      --ink:         #e7edef;
+      --ink-2:       #9cabb2;
+      --ink-3:       #7b8a91;
+      --line:        #2b353b;
+      --line-strong: #3c4952;
+      --accent:      #f0685a;
+      --accent-ink:  #f7897d;
+      --accent-soft: #351c19;
+      --ok:          #52c295;
+      --warn:        #d9a05a;
+      --warn-soft:   #33291a;
+      --dot-post:    #f0685a;
+      --dot-yamato:  #4fb97a;
+      --shadow:      0 1px 2px rgba(0,0,0,.4), 0 10px 28px -18px rgba(0,0,0,.9);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground:      #11161a;
+    --surface:     #1a2126;
+    --surface-2:   #212a30;
+    --ink:         #e7edef;
+    --ink-2:       #9cabb2;
+    --ink-3:       #7b8a91;
+    --line:        #2b353b;
+    --line-strong: #3c4952;
+    --accent:      #f0685a;
+    --accent-ink:  #f7897d;
+    --accent-soft: #351c19;
+    --ok:          #52c295;
+    --warn:        #d9a05a;
+    --warn-soft:   #33291a;
+    --dot-post:    #f0685a;
+    --dot-yamato:  #4fb97a;
+    --shadow:      0 1px 2px rgba(0,0,0,.4), 0 10px 28px -18px rgba(0,0,0,.9);
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "Zen Kaku Gothic New", "Hiragino Kaku Gothic ProN", "Yu Gothic", system-ui, sans-serif;
+    font-size: 15px;
+    line-height: 1.7;
+    font-feature-settings: "palt" 1;
+  }
+  img { max-width: 100%; }
+
+  .wrap {
+    max-width: 1060px;
+    margin: 0 auto;
+    padding-inline: 18px;
+    padding-block: 28px 56px;
+  }
+
+  /* ---------- header ---------- */
+  .masthead { border-bottom: 2px solid var(--ink); padding-bottom: 16px; margin-bottom: 22px; }
+  .kicker {
+    font-size: 11px; letter-spacing: .18em; text-transform: uppercase;
+    color: var(--ink-3); font-family: "Roboto Mono", ui-monospace, monospace; margin: 0 0 6px;
+  }
+  h1 {
+    font-size: clamp(28px, 6vw, 40px); font-weight: 900; letter-spacing: .02em;
+    margin: 0 0 8px; line-height: 1.2; text-wrap: balance;
+  }
+  .lede { margin: 0; color: var(--ink-2); max-width: 62ch; font-size: 14px; }
+
+  /* ---------- layout ---------- */
+  .cols { display: grid; gap: 22px; grid-template-columns: 1fr; align-items: start; }
+  @media (min-width: 860px) {
+    .cols { grid-template-columns: 318px 1fr; gap: 26px; }
+    .panel-outer { position: sticky; top: 20px; }
+  }
+
+  /* ---------- input panel ---------- */
+  .panel {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: var(--radius); box-shadow: var(--shadow);
+    padding: 18px; display: flex; flex-direction: column; gap: 18px;
+  }
+  .field-label {
+    display: block; font-size: 11px; font-weight: 700; letter-spacing: .12em;
+    color: var(--ink-3); margin-bottom: 8px; font-family: "Roboto Mono", ui-monospace, monospace;
+  }
+  .dims { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .cell { display: flex; flex-direction: column; gap: 4px; }
+  .cell small { font-size: 11px; color: var(--ink-2); font-weight: 500; }
+  .inputbox { position: relative; display: flex; align-items: center; }
+  .inputbox input {
+    width: 100%; font: 500 17px/1.2 "Roboto Mono", ui-monospace, monospace;
+    color: var(--ink); background: var(--surface-2);
+    border: 1px solid var(--line); border-radius: 7px;
+    padding: 9px 30px 9px 10px; appearance: textfield; -moz-appearance: textfield;
+  }
+  .inputbox input::-webkit-outer-spin-button,
+  .inputbox input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .inputbox .unit {
+    position: absolute; right: 9px; font-size: 11px; color: var(--ink-3);
+    font-family: "Roboto Mono", ui-monospace, monospace; pointer-events: none;
+  }
+  input:focus-visible, button:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 2px;
+  }
+  .inputbox input:focus { border-color: var(--line-strong); }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip {
+    font: 500 12px/1 "Zen Kaku Gothic New", sans-serif; color: var(--ink-2);
+    background: var(--surface-2); border: 1px solid var(--line);
+    border-radius: 999px; padding: 7px 11px; cursor: pointer;
+  }
+  .chip:hover { border-color: var(--line-strong); color: var(--ink); }
+  .chip[aria-pressed="true"] {
+    background: var(--ink); border-color: var(--ink); color: var(--surface);
+  }
+  .seg { display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .seg button {
+    flex: 1; font: 500 12.5px/1 "Zen Kaku Gothic New", sans-serif;
+    background: var(--surface-2); color: var(--ink-2);
+    border: 0; border-right: 1px solid var(--line); padding: 9px 4px; cursor: pointer;
+  }
+  .seg button:last-child { border-right: 0; }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: var(--surface); }
+
+  .panel-note {
+    font-size: 11.5px; color: var(--ink-3); line-height: 1.6;
+    border-top: 1px dashed var(--line); padding-top: 12px; margin: 0;
+  }
+
+  /* ---------- 改定のお知らせ ---------- */
+  .banner {
+    margin: 0 0 18px; padding: 11px 14px; font-size: 12.5px; line-height: 1.7;
+    background: var(--warn-soft); color: var(--ink);
+    border: 1px solid var(--line); border-left: 3px solid var(--warn);
+    border-radius: 4px;
+  }
+  .banner strong { font-weight: 700; color: var(--warn); }
+  .banner.on {
+    background: var(--accent-soft); border-left-color: var(--accent);
+  }
+  .banner.on strong { color: var(--accent-ink); }
+
+  /* ---------- metrics ---------- */
+  .metrics {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px;
+    background: var(--line); border: 1px solid var(--line);
+    border-radius: var(--radius); overflow: hidden; margin-bottom: 20px;
+  }
+  @media (max-width: 520px) { .metrics { grid-template-columns: repeat(2, 1fr); } }
+  .metric { background: var(--surface); padding: 12px 13px; }
+  .metric dt {
+    font: 500 10.5px/1.4 "Roboto Mono", ui-monospace, monospace;
+    letter-spacing: .08em; color: var(--ink-3); margin: 0 0 3px;
+  }
+  .metric dd {
+    margin: 0; font-size: 21px; font-weight: 700; letter-spacing: .01em;
+    font-variant-numeric: tabular-nums;
+  }
+  .metric dd .u { font-size: 12px; font-weight: 500; color: var(--ink-2); margin-left: 2px; }
+
+  /* ---------- results ---------- */
+  .sec-head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    gap: 12px; margin: 0 0 10px; flex-wrap: wrap;
+  }
+  .sec-head h2 { font-size: 15px; font-weight: 700; margin: 0; letter-spacing: .04em; }
+  .sec-head .count {
+    font: 500 11.5px/1 "Roboto Mono", ui-monospace, monospace; color: var(--ink-3);
+  }
+
+  .list {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden;
+  }
+  .row {
+    display: grid; grid-template-columns: 1fr auto; gap: 6px 16px;
+    padding: 14px 16px; border-top: 1px solid var(--line); align-items: start;
+  }
+  .row:first-child { border-top: 0; }
+  .row.best { background: var(--accent-soft); }
+  .row-main { min-width: 0; }
+  .row-title { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+  .row-title .name { font-size: 15.5px; font-weight: 700; letter-spacing: .01em; }
+  .brand {
+    display: inline-flex; align-items: center; gap: 5px;
+    font: 500 11px/1 "Zen Kaku Gothic New", sans-serif; color: var(--ink-2);
+    border: 1px solid var(--line); border-radius: 4px; padding: 4px 7px; white-space: nowrap;
+  }
+  .brand::before {
+    content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--dot);
+  }
+  .flag {
+    font: 700 10.5px/1 "Zen Kaku Gothic New", sans-serif; letter-spacing: .06em;
+    padding: 4px 6px; border-radius: 4px; white-space: nowrap;
+  }
+  .flag.best { background: var(--accent); color: #fff; }
+  .flag.tight { background: var(--warn-soft); color: var(--warn); border: 1px solid currentColor; }
+  .flag.limit { background: var(--surface-2); color: var(--ink-2); border: 1px solid var(--line); }
+  .flag.rev { background: var(--warn-soft); color: var(--warn); border: 1px solid currentColor; }
+
+  .spec {
+    font: 400 11.5px/1.6 "Roboto Mono", ui-monospace, monospace;
+    color: var(--ink-3); margin: 5px 0 0;
+  }
+  .tags { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 6px; }
+  .tag { font-size: 11.5px; color: var(--ink-2); }
+  .tag::before { content: "・"; color: var(--ink-3); }
+  .note { font-size: 11.5px; color: var(--ink-2); margin: 6px 0 0; line-height: 1.6; }
+
+  .price { text-align: right; white-space: nowrap; }
+  .price .amount {
+    font-size: 23px; font-weight: 900; letter-spacing: .01em;
+    font-variant-numeric: tabular-nums; display: block; line-height: 1.25;
+  }
+  .row.best .price .amount { color: var(--accent-ink); }
+  .price .yen { font-size: 14px; font-weight: 700; margin-right: 1px; }
+  .price .break {
+    font: 400 11px/1.5 "Roboto Mono", ui-monospace, monospace; color: var(--ink-3);
+    display: block;
+  }
+
+  .row.out { grid-template-columns: 1fr auto; padding: 11px 16px; }
+  .row.out .name { font-size: 13.5px; font-weight: 500; color: var(--ink-2); }
+  .row.out .why {
+    font: 400 11.5px/1.5 "Roboto Mono", ui-monospace, monospace; color: var(--ink-3);
+    text-align: right;
+  }
+
+  .empty { padding: 28px 16px; text-align: center; color: var(--ink-2); font-size: 13.5px; }
+
+  details.out-box { margin-top: 18px; }
+  details.out-box > summary {
+    cursor: pointer; font-size: 13px; font-weight: 700; color: var(--ink-2);
+    padding: 4px 0; letter-spacing: .03em;
+  }
+  details.out-box > summary::marker { color: var(--ink-3); }
+  details.out-box .list { margin-top: 10px; }
+
+  footer.fine {
+    margin-top: 30px; padding-top: 16px; border-top: 1px solid var(--line);
+    font-size: 11.5px; color: var(--ink-3); line-height: 1.8;
+  }
+  footer.fine strong { color: var(--ink-2); font-weight: 700; }
+  footer.fine ul { margin: 6px 0 0; padding-left: 1.2em; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+
+<div class="wrap">
+  <header class="masthead">
+    <p class="kicker">SHIPPING COST FINDER / JAPAN</p>
+    <h1>送料くらべ</h1>
+    <p class="lede">
+      荷物の3辺と重さを入れると、普通郵便・クリックポスト・らくらくメルカリ便・ゆうゆうメルカリ便・ゆうパケットポストなど
+      20種類の発送方法から「実際に送れるもの」だけを安い順に並べます。資材代（専用箱・シール代）込みの金額です。
+    </p>
+  </header>
+
+  <div class="cols">
+    <!-- ===== 入力パネル ===== -->
+    <div class="panel-outer">
+      <form class="panel" id="form" autocomplete="off" onsubmit="return false;">
+        <div>
+          <span class="field-label">適用する料金</span>
+          <div class="seg" id="rates" role="group" aria-label="適用する料金">
+            <button type="button" data-rate="now" aria-pressed="true">現在</button>
+            <button type="button" data-rate="after" aria-pressed="false">2026/10/1〜</button>
+          </div>
+        </div>
+
+        <div>
+          <span class="field-label">荷物のサイズ（外寸）</span>
+          <div class="dims">
+            <label class="cell">
+              <small>たて</small>
+              <span class="inputbox"><input id="d1" type="number" min="0" step="0.1" value="24"><span class="unit">cm</span></span>
+            </label>
+            <label class="cell">
+              <small>よこ</small>
+              <span class="inputbox"><input id="d2" type="number" min="0" step="0.1" value="18"><span class="unit">cm</span></span>
+            </label>
+            <label class="cell">
+              <small>厚さ</small>
+              <span class="inputbox"><input id="d3" type="number" min="0" step="0.1" value="3"><span class="unit">cm</span></span>
+            </label>
+          </div>
+        </div>
+
+        <div>
+          <label class="field-label" for="wt">重さ</label>
+          <span class="inputbox"><input id="wt" type="number" min="0" step="10" value="250"><span class="unit">g</span></span>
+        </div>
+
+        <div>
+          <span class="field-label">よくある荷物から入力</span>
+          <div class="chips" id="presets"></div>
+        </div>
+
+        <div>
+          <span class="field-label">サービスの種類</span>
+          <div class="seg" id="groups" role="group" aria-label="サービスの種類">
+            <button type="button" data-group="all" aria-pressed="true">すべて</button>
+            <button type="button" data-group="post" aria-pressed="false">郵便・一般</button>
+            <button type="button" data-group="mercari" aria-pressed="false">メルカリ便</button>
+          </div>
+        </div>
+
+        <div>
+          <span class="field-label">条件でしぼる</span>
+          <div class="chips" id="filters">
+            <button type="button" class="chip" data-tag="追跡" aria-pressed="false">追跡あり</button>
+            <button type="button" class="chip" data-tag="匿名配送" aria-pressed="false">匿名配送</button>
+            <button type="button" class="chip" data-tag="ポスト投函" aria-pressed="false">ポスト投函</button>
+            <button type="button" class="chip" data-tag="補償" aria-pressed="false">補償あり</button>
+          </div>
+        </div>
+
+        <p class="panel-note">
+          厚さは3辺のうち一番短い辺として扱います。封筒・箱に入れた「梱包後」の寸法で入力してください。
+        </p>
+      </form>
+    </div>
+
+    <!-- ===== 結果 ===== -->
+    <main>
+      <p class="banner" id="banner">
+        <strong>2026年10月1日</strong> に日本郵便が運賃を改定します。クリックポストは185円→<strong>240円</strong>（2kgまでに拡大）、
+        ゆうパケットは厚さ別料金を廃止して<strong>一律360円</strong>。「適用する料金」を切り替えると新料金で比較できます。
+      </p>
+
+      <dl class="metrics" id="metrics">
+        <div class="metric"><dt>3辺合計</dt><dd id="m-sum">45.0<span class="u">cm</span></dd></div>
+        <div class="metric"><dt>最長辺</dt><dd id="m-long">24.0<span class="u">cm</span></dd></div>
+        <div class="metric"><dt>厚さ</dt><dd id="m-thick">3.0<span class="u">cm</span></dd></div>
+        <div class="metric"><dt>宅配サイズ</dt><dd id="m-size">60<span class="u">サイズ</span></dd></div>
+      </dl>
+
+      <div class="sec-head">
+        <h2>送れる発送方法</h2>
+        <span class="count" id="ok-count"></span>
+      </div>
+      <div class="list" id="ok-list"></div>
+
+      <details class="out-box" id="ng-box">
+        <summary>サイズ・重さで送れないもの <span id="ng-count"></span></summary>
+        <div class="list" id="ng-list"></div>
+      </details>
+
+      <footer class="fine">
+        <strong>料金の基準（2026年9月時点）</strong>
+        <ul>
+          <li>定形・定形外郵便は2024年10月1日改定後、ゆうメールは2025年11月1日改定後、ネコポスのサイズは2025年11月10日拡大後の内容です。</li>
+          <li>2026年10月1日の日本郵便の運賃改定（クリックポスト240円・ゆうパケット一律360円）は「適用する料金」で切り替えられます。レターパック・スマートレター・定形郵便・定形外郵便は今回の改定対象外です。</li>
+          <li>メルカリ便はメルカリでの取引が前提で、販売手数料とは別の送料です。資材代（発送用シール5円・専用箱65円・専用BOX70円・専用封筒20円）は合計金額に含めています。</li>
+          <li>メルカリ便以外の通常の宅急便・ゆうパックは距離で料金が変わるため、ここには含めていません（通常のゆうパックも2026年10月1日に平均約10%値上げされます）。</li>
+          <li>ゆうメールは書籍・CD・DVDなどの印刷物・電磁的記録媒体に限られます。らくらくメルカリ便の宅急便180・200サイズは、ヤマト運輸の営業所持ち込みか集荷のみです。</li>
+          <li>実際の料金・規格は必ず各社の公式情報で最終確認してください。</li>
+        </ul>
+      </footer>
+    </main>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ===== 料金表（2024年10月 郵便料金改定後 / メルカリ便は全国一律） =====
+  // fit: 通る条件の候補。いずれか1つを満たせばOK（専用箱が複数ある場合など）
+  //   maxLong=最長辺 / maxShort=2番目の辺 / maxThick=厚さ / maxSum=3辺合計 / minLong,minShort=最小寸法
+  // fee: flat=定額 / weight=重さ別 [上限g, 円] / size=3辺合計別 [サイズ, 円, そのサイズの重量上限g]
+  var METHODS = [
+    {
+      id: "miniletter", name: "ミニレター（郵便書簡）", brand: "日本郵便", dot: "post", group: "post",
+      fit: [{ maxLong: 23.5, maxShort: 12, maxThick: 1 }], maxWeight: 25,
+      fee: { type: "flat", value: 85 }, tags: ["ポスト投函"],
+      note: "封筒兼用の専用便箋（85円）を買って使います。追跡・補償なし。"
+    },
+    {
+      id: "teikei", name: "定形郵便", brand: "日本郵便", dot: "post", group: "post",
+      fit: [{ maxLong: 23.5, maxShort: 12, maxThick: 1, minLong: 14, minShort: 9 }], maxWeight: 50,
+      fee: { type: "flat", value: 110 }, tags: ["ポスト投函"],
+      note: "追跡・補償なし。50gを超えると定形外になります。"
+    },
+    {
+      id: "teikeigai-in", name: "定形外郵便（規格内）", brand: "日本郵便", dot: "post", group: "post",
+      fit: [{ maxLong: 34, maxShort: 25, maxThick: 3, minLong: 14, minShort: 9 }], maxWeight: 1000,
+      fee: { type: "weight", tiers: [[50, 140], [100, 180], [150, 270], [250, 320], [500, 510], [1000, 750]] },
+      tags: ["ポスト投函"], note: "追跡・補償なし。オプションで特定記録（+210円）を付けられます。"
+    },
+    {
+      id: "teikeigai-out", name: "定形外郵便（規格外）", brand: "日本郵便", dot: "post", group: "post",
+      fit: [{ maxLong: 60, maxSum: 90, minLong: 14, minShort: 9 }], maxWeight: 4000,
+      fee: { type: "weight", tiers: [[50, 260], [100, 290], [150, 390], [250, 450], [500, 660], [1000, 920], [2000, 1350], [4000, 1750]] },
+      tags: [], note: "規格内（34×25×3cm）を超える郵便物。追跡・補償なし。"
+    },
+    {
+      id: "yumail", name: "ゆうメール（規格内）", brand: "日本郵便", dot: "post", group: "post",
+      fit: [{ maxLong: 34, maxShort: 25, maxThick: 3 }], maxWeight: 1000,
+      fee: { type: "weight", tiers: [[150, 190], [250, 230], [500, 320], [1000, 380]] },
+      tags: ["ポスト投函"], restricted: "内容物に制限",
+      note: "書籍・CD・DVDなどの印刷物専用。中身を確認できる状態にして差し出します。"
+    },
+    {
+      id: "smartletter", name: "スマートレター", brand: "日本郵便", dot: "post", group: "post",
+      fit: [{ maxLong: 25, maxShort: 17, maxThick: 2 }], maxWeight: 1000,
+      fee: { type: "flat", value: 210 }, tags: ["ポスト投函"],
+      note: "専用封筒（210円・料金込み）をコンビニや郵便局で購入。追跡・補償なし。"
+    },
+    {
+      id: "clickpost", name: "クリックポスト", brand: "日本郵便", dot: "post", group: "post",
+      fit: [{ maxLong: 34, maxShort: 25, maxThick: 3, minLong: 14, minShort: 9 }], maxWeight: 1000,
+      fee: { type: "flat", value: 185 }, tags: ["追跡", "ポスト投函"],
+      note: "Yahoo! JAPAN ID か Amazon Pay でラベルを作って印刷。補償なし。"
+    },
+    {
+      id: "letterpack-light", name: "レターパックライト", brand: "日本郵便", dot: "post", group: "post",
+      fit: [{ maxLong: 34, maxShort: 24.8, maxThick: 3 }], maxWeight: 4000,
+      fee: { type: "flat", value: 430 }, tags: ["追跡", "ポスト投函"],
+      note: "専用封筒（430円・料金込み）。受取はポスト投函。"
+    },
+    {
+      id: "letterpack-plus", name: "レターパックプラス", brand: "日本郵便", dot: "post", group: "post",
+      fit: [{ maxLong: 34, maxShort: 24.8, maxThick: 7 }], maxWeight: 4000,
+      fee: { type: "flat", value: 600 }, tags: ["追跡", "対面受取", "集荷可"],
+      note: "厚さ制限なし（封ができる範囲。目安7cmで判定）。対面でお届け。"
+    },
+    {
+      id: "yupacket", name: "ゆうパケット", brand: "日本郵便", dot: "post", group: "post",
+      fit: [{ maxLong: 34, maxSum: 60, maxThick: 3, minLong: 14 }], maxWeight: 1000,
+      fee: { type: "thickness", tiers: [[1, 250], [2, 310], [3, 360]] },
+      tags: ["追跡", "ポスト投函"], note: "厚さで料金が変わります。郵便局の窓口かポストから差し出し。"
+    },
+    {
+      id: "yupacket-post-seal", name: "ゆうパケットポスト（発送用シール）", brand: "ゆうゆうメルカリ便", dot: "post", group: "mercari",
+      fit: [{ maxLong: 34, maxSum: 60, maxThick: 3 }], maxWeight: 2000,
+      fee: { type: "flat", value: 215 }, material: { label: "発送用シール", price: 5 },
+      tags: ["追跡", "補償", "匿名配送", "ポスト投函"],
+      note: "手持ちの箱・袋にシールを貼ってポストへ投函。投入口に入る厚さが必要です。"
+    },
+    {
+      id: "yupacket-post-box", name: "ゆうパケットポスト（専用箱）", brand: "ゆうゆうメルカリ便", dot: "post", group: "mercari",
+      fit: [{ maxLong: 32.7, maxShort: 22.8, maxThick: 3 }], maxWeight: 2000,
+      fee: { type: "flat", value: 215 }, material: { label: "専用箱", price: 65 },
+      tags: ["追跡", "補償", "匿名配送", "ポスト投函"],
+      note: "専用箱（32.7×22.8×3cm・65円）に入れてポストへ投函。"
+    },
+    {
+      id: "yupacket-post-mini", name: "ゆうパケットポストmini", brand: "ゆうゆうメルカリ便", dot: "post", group: "mercari",
+      fit: [{ maxLong: 21.6, maxShort: 17.8, maxThick: 3 }], maxWeight: 2000,
+      fee: { type: "flat", value: 160 }, material: { label: "専用封筒", price: 20 },
+      tags: ["追跡", "補償", "匿名配送", "ポスト投函"],
+      note: "専用封筒（外寸21.6×17.8cm・内寸21.1×16.8cm・20円）に入る小物向け。A5がちょうど収まります。"
+    },
+    {
+      id: "yupacket-mercari", name: "ゆうパケット", brand: "ゆうゆうメルカリ便", dot: "post", group: "mercari",
+      fit: [{ maxLong: 34, maxSum: 60, maxThick: 3 }], maxWeight: 1000,
+      fee: { type: "flat", value: 230 }, tags: ["追跡", "補償", "匿名配送", "コンビニ発送"],
+      note: "ローソン・郵便局・はこぽすから発送。厚さ3cm以内で一律。"
+    },
+    {
+      id: "yupacket-plus", name: "ゆうパケットプラス", brand: "ゆうゆうメルカリ便", dot: "post", group: "mercari",
+      fit: [{ maxLong: 24, maxShort: 17, maxThick: 7 }], maxWeight: 2000,
+      fee: { type: "flat", value: 455 }, material: { label: "専用箱", price: 65 },
+      tags: ["追跡", "補償", "匿名配送", "コンビニ発送"],
+      note: "専用箱（24×17×7cm・65円）。厚みのある小物に。"
+    },
+    {
+      id: "yupack-mercari", name: "ゆうパック", brand: "ゆうゆうメルカリ便", dot: "post", group: "mercari",
+      fit: [{ maxSum: 100 }], maxWeight: 25000,
+      fee: { type: "size", tiers: [[60, 770], [80, 870], [100, 1070]] },
+      tags: ["追跡", "補償", "匿名配送", "コンビニ発送", "対面受取"],
+      note: "ゆうゆうメルカリ便は100サイズ・25kgまで。それ以上はらくらくメルカリ便へ。"
+    },
+    {
+      id: "nekopos", name: "ネコポス", brand: "らくらくメルカリ便", dot: "yamato", group: "mercari",
+      fit: [{ maxLong: 34, maxSum: 60, maxThick: 3, minLong: 23, minShort: 11.5 }], maxWeight: 1000,
+      fee: { type: "flat", value: 210 }, tags: ["追跡", "補償", "匿名配送", "ポスト投函"],
+      note: "2025年11月10日にサイズ拡大（旧：角形A4 31.2×22.8cm）。最小23×11.5cmの下限があります。"
+    },
+    {
+      id: "compact", name: "宅急便コンパクト", brand: "らくらくメルカリ便", dot: "yamato", group: "mercari",
+      fit: [
+        { maxLong: 25, maxShort: 20, maxThick: 5 },
+        { maxLong: 34, maxShort: 24.8, maxThick: 1 }
+      ], maxWeight: 25000,
+      fee: { type: "flat", value: 450 }, material: { label: "専用BOX", price: 70 },
+      tags: ["追跡", "補償", "匿名配送", "コンビニ発送", "集荷可"],
+      note: "専用BOX（25×20×5cm）または薄型BOX（24.8×34cm）・70円。重さの制限なし。"
+    },
+    {
+      id: "takkyubin", name: "宅急便", brand: "らくらくメルカリ便", dot: "yamato", group: "mercari",
+      fit: [{ maxSum: 200 }], maxWeight: 30000,
+      fee: {
+        type: "size", byWeight: true,
+        tiers: [[60, 750, 2000], [80, 850, 5000], [100, 1050, 10000], [120, 1200, 15000],
+                [140, 1450, 20000], [160, 1700, 25000], [180, 2100, 30000], [200, 2500, 30000]]
+      },
+      tags: ["追跡", "補償", "匿名配送", "コンビニ発送", "集荷可", "対面受取"],
+      note: "サイズと重さの大きいほうで料金が決まります（例：60サイズでも3kgなら80サイズ料金）。"
+    },
+    {
+      id: "tanomel", name: "梱包・発送たのメル便", brand: "メルカリ", dot: "yamato", group: "mercari",
+      fit: [{ maxSum: 450 }], maxWeight: 150000,
+      fee: {
+        type: "size",
+        tiers: [[80, 1700], [120, 2400], [160, 3400], [200, 5000], [250, 8600],
+                [300, 12000], [350, 18500], [400, 25400], [450, 33000]]
+      },
+      tags: ["追跡", "補償", "匿名配送", "集荷可", "対面受取"],
+      note: "梱包から配送までヤマトが対応。家具・家電などの大型品向け。"
+    }
+  ];
+
+  // ===== 2026年10月1日 日本郵便 運賃改定の上書き =====
+  // レターパック・スマートレター・定形郵便・定形外郵便は今回の改定対象外
+  var REVISION_2026_10 = {
+    clickpost: {
+      fit: [{ maxLong: 34, maxSum: 60, maxThick: 3, minLong: 14, minShort: 9 }], maxWeight: 2000,
+      fee: { type: "flat", value: 240 },
+      note: "2026年10月1日改定で185円→240円、2kgまでに拡大。差出はポスト投函のみ（窓口差出は廃止）。"
+    },
+    yupacket: {
+      fit: [{ maxLong: 34, maxSum: 60, maxThick: 3, minLong: 14 }],
+      fee: { type: "flat", value: 360 },
+      note: "2026年10月1日改定で厚さ別料金を廃止し一律360円。郵便ポストに投函できる厚さ（目安3cm）が必要です。"
+    }
+  };
+
+  var PRESETS = [
+    { label: "アクセサリー", d: [10, 7, 1], w: 30 },
+    { label: "スマホケース", d: [16, 9, 2], w: 80 },
+    { label: "文庫本1冊", d: [15, 11, 2], w: 200 },
+    { label: "Tシャツ", d: [24, 18, 3], w: 250 },
+    { label: "マンガ5冊", d: [19, 13, 9], w: 1000 },
+    { label: "スニーカー箱", d: [33, 22, 13], w: 1200 },
+    { label: "衣装ケース", d: [50, 40, 30], w: 5000 }
+  ];
+
+  // ===== 状態 =====
+  var state = { group: "all", tags: [], rate: "now" };
+
+  // 改定後モードのときだけ、該当する発送方法の内容を差し替える
+  function applyRate(m) {
+    if (state.rate !== "after" || !REVISION_2026_10[m.id]) return m;
+    var over = REVISION_2026_10[m.id], merged = {}, k;
+    for (k in m) if (Object.prototype.hasOwnProperty.call(m, k)) merged[k] = m[k];
+    for (k in over) if (Object.prototype.hasOwnProperty.call(over, k)) merged[k] = over[k];
+    return merged;
+  }
+
+  var $ = function (id) { return document.getElementById(id); };
+  var els = {
+    d: [$("d1"), $("d2"), $("d3")], w: $("wt"),
+    okList: $("ok-list"), ngList: $("ng-list"),
+    okCount: $("ok-count"), ngCount: $("ng-count"), ngBox: $("ng-box")
+  };
+
+  function num(el) { var v = parseFloat(el.value); return isFinite(v) && v > 0 ? v : 0; }
+  function fmtCm(v) { return (Math.round(v * 10) / 10).toFixed(1); }
+  function yen(v) { return v.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ","); }
+  function gram(v) { return v >= 1000 ? (v / 1000) + "kg" : v + "g"; }
+
+  // ===== 判定 =====
+  function checkFit(f, dim, weight, maxWeight) {
+    var fails = [], tight = 0;
+    function chk(val, max, label) {
+      if (max == null) return;
+      tight = Math.max(tight, val / max);
+      if (val > max + 1e-9) fails.push(label + " " + fmtCm(val) + "cm ＞ " + fmtCm(max) + "cm");
+    }
+    chk(dim.L, f.maxLong, "最長辺");
+    chk(dim.W, f.maxShort, "2番目の辺");
+    chk(dim.T, f.maxThick, "厚さ");
+    chk(dim.S, f.maxSum, "3辺合計");
+    if (f.minLong && dim.L < f.minLong) fails.push("最長辺が最小 " + fmtCm(f.minLong) + "cm 未満");
+    if (f.minShort && dim.W < f.minShort) fails.push("短辺が最小 " + fmtCm(f.minShort) + "cm 未満");
+    if (maxWeight != null) {
+      tight = Math.max(tight, weight / maxWeight);
+      if (weight > maxWeight) fails.push("重さ " + gram(weight) + " ＞ " + gram(maxWeight));
+    }
+    return { fails: fails, tight: tight };
+  }
+
+  function priceOf(m, dim, weight) {
+    var f = m.fee, i;
+    if (f.type === "flat") return { value: f.value, label: null };
+    if (f.type === "weight") {
+      for (i = 0; i < f.tiers.length; i++) {
+        if (weight <= f.tiers[i][0]) return { value: f.tiers[i][1], label: gram(f.tiers[i][0]) + "まで" };
+      }
+      return null;
+    }
+    if (f.type === "thickness") {
+      for (i = 0; i < f.tiers.length; i++) {
+        if (dim.T <= f.tiers[i][0] + 1e-9) return { value: f.tiers[i][1], label: "厚さ" + f.tiers[i][0] + "cmまで" };
+      }
+      return null;
+    }
+    if (f.type === "size") {
+      var si = -1, wi = -1;
+      for (i = 0; i < f.tiers.length; i++) { if (dim.S <= f.tiers[i][0]) { si = i; break; } }
+      if (si < 0) return null;
+      if (f.byWeight) {
+        for (i = 0; i < f.tiers.length; i++) { if (weight <= f.tiers[i][2]) { wi = i; break; } }
+        if (wi < 0) return null;
+        si = Math.max(si, wi);
+      }
+      return { value: f.tiers[si][1], label: f.tiers[si][0] + "サイズ" };
+    }
+    return null;
+  }
+
+  function limitText(m) {
+    var f = m.fit[0], parts = [];
+    if (f.maxLong != null && f.maxShort != null) parts.push(fmtCm(f.maxLong) + "×" + fmtCm(f.maxShort) + (f.maxThick != null ? "×" + fmtCm(f.maxThick) : "") + "cm");
+    else {
+      if (f.maxLong != null) parts.push("最長辺" + fmtCm(f.maxLong) + "cm");
+      if (f.maxSum != null) parts.push("3辺計" + fmtCm(f.maxSum) + "cm");
+      if (f.maxThick != null) parts.push("厚さ" + fmtCm(f.maxThick) + "cm");
+    }
+    if (m.fit.length > 1) parts.push("ほか" + (m.fit.length - 1) + "種の箱");
+    if (m.maxWeight != null && m.maxWeight < 100000) parts.push(gram(m.maxWeight) + "まで");
+    return parts.join(" / ");
+  }
+
+  // ===== 描画 =====
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+
+  function render() {
+    var vals = [num(els.d[0]), num(els.d[1]), num(els.d[2])].sort(function (a, b) { return b - a; });
+    var dim = { L: vals[0], W: vals[1], T: vals[2], S: vals[0] + vals[1] + vals[2] };
+    var weight = num(els.w);
+
+    // 指標
+    $("m-sum").innerHTML = fmtCm(dim.S) + '<span class="u">cm</span>';
+    $("m-long").innerHTML = fmtCm(dim.L) + '<span class="u">cm</span>';
+    $("m-thick").innerHTML = fmtCm(dim.T) + '<span class="u">cm</span>';
+    var std = [60, 80, 100, 120, 140, 160, 170, 180, 200], label = "－";
+    for (var k = 0; k < std.length; k++) { if (dim.S <= std[k]) { label = std[k] + '<span class="u">サイズ</span>'; break; } }
+    if (label === "－" && dim.S > 200) label = '200<span class="u">超</span>';
+    if (dim.S === 0) label = '<span class="u">未入力</span>';
+    $("m-size").innerHTML = label;
+
+    var ok = [], ng = [];
+
+    METHODS.forEach(function (base) {
+      var m = applyRate(base);
+      if (state.group !== "all" && m.group !== state.group) return;
+      for (var t = 0; t < state.tags.length; t++) {
+        if (m.tags.indexOf(state.tags[t]) < 0) return;
+      }
+      if (dim.S === 0 || weight === 0) return;
+
+      // 複数の箱候補のうち、失敗数が最も少ないものを採用
+      var best = null;
+      m.fit.forEach(function (f) {
+        var r = checkFit(f, dim, weight, m.maxWeight);
+        if (!best || r.fails.length < best.fails.length) best = r;
+      });
+
+      if (best.fails.length) { ng.push({ m: m, why: best.fails[0] }); return; }
+
+      var p = priceOf(m, dim, weight);
+      if (!p) { ng.push({ m: m, why: "料金区分の範囲外" }); return; }
+
+      var mat = m.material ? m.material.price : 0;
+      ok.push({ m: m, total: p.value + mat, fee: p.value, mat: mat, tier: p.label, tight: best.tight });
+    });
+
+    ok.sort(function (a, b) { return a.total - b.total || a.m.name.localeCompare(b.m.name, "ja"); });
+
+    // 送れる方法
+    if (!ok.length) {
+      els.okList.innerHTML = '<p class="empty">' +
+        (dim.S === 0 || weight === 0 ? "サイズと重さを入力してください。" : "条件に合う発送方法が見つかりませんでした。条件のしぼり込みを外してみてください。") +
+        "</p>";
+    } else {
+      els.okList.innerHTML = ok.map(function (r, i) {
+        var m = r.m;
+        var flags = "";
+        if (i === 0) flags += '<span class="flag best">最安</span>';
+        if (state.rate === "after" && REVISION_2026_10[m.id]) flags += '<span class="flag rev">新運賃</span>';
+        if (r.tight >= 0.92) flags += '<span class="flag tight">ぎりぎり</span>';
+        if (m.restricted) flags += '<span class="flag limit">' + esc(m.restricted) + "</span>";
+        var brk = [];
+        if (r.tier) brk.push(r.tier);
+        if (r.mat) brk.push("送料" + yen(r.fee) + " + " + m.material.label + yen(r.mat));
+        return '' +
+          '<div class="row' + (i === 0 ? " best" : "") + '">' +
+            '<div class="row-main">' +
+              '<div class="row-title">' +
+                '<span class="name">' + esc(m.name) + "</span>" +
+                '<span class="brand" style="--dot:var(--dot-' + m.dot + ')">' + esc(m.brand) + "</span>" +
+                flags +
+              "</div>" +
+              '<p class="spec">' + esc(limitText(m)) + "</p>" +
+              '<div class="tags">' + m.tags.map(function (t) { return '<span class="tag">' + esc(t) + "</span>"; }).join("") + "</div>" +
+              '<p class="note">' + esc(m.note) + "</p>" +
+            "</div>" +
+            '<div class="price">' +
+              '<span class="amount"><span class="yen">¥</span>' + yen(r.total) + "</span>" +
+              (brk.length ? '<span class="break">' + esc(brk.join(" / ")) + "</span>" : "") +
+            "</div>" +
+          "</div>";
+      }).join("");
+    }
+    els.okCount.textContent = ok.length ? ok.length + "件 / 最安 ¥" + yen(ok[0].total) : "";
+
+    // 送れない方法
+    els.ngList.innerHTML = ng.map(function (r) {
+      return '<div class="row out">' +
+        '<span class="name">' + esc(r.m.name) + '<span class="brand" style="--dot:var(--dot-' + r.m.dot + ');margin-left:8px">' + esc(r.m.brand) + "</span></span>" +
+        '<span class="why">' + esc(r.why) + "</span>" +
+        "</div>";
+    }).join("");
+    els.ngCount.textContent = ng.length ? "（" + ng.length + "件）" : "（なし）";
+    els.ngBox.style.display = ng.length ? "" : "none";
+  }
+
+  // ===== イベント =====
+  els.d.concat([els.w]).forEach(function (el) { el.addEventListener("input", render); });
+
+  var presetBox = $("presets");
+  presetBox.innerHTML = PRESETS.map(function (p, i) {
+    return '<button type="button" class="chip" data-i="' + i + '">' + esc(p.label) + "</button>";
+  }).join("");
+  presetBox.addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-i]"); if (!b) return;
+    var p = PRESETS[+b.dataset.i];
+    els.d[0].value = p.d[0]; els.d[1].value = p.d[1]; els.d[2].value = p.d[2];
+    els.w.value = p.w;
+    render();
+  });
+
+  $("rates").addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-rate]"); if (!b) return;
+    state.rate = b.dataset.rate;
+    Array.prototype.forEach.call(this.querySelectorAll("button"), function (x) {
+      x.setAttribute("aria-pressed", String(x === b));
+    });
+    var bn = $("banner");
+    bn.className = state.rate === "after" ? "banner on" : "banner";
+    bn.innerHTML = state.rate === "after"
+      ? '<strong>2026年10月1日以降</strong>の新運賃で計算しています。クリックポスト240円（2kgまで・ポスト投函のみ）、ゆうパケット一律360円。' +
+        'レターパック・スマートレター・定形郵便・定形外郵便は今回の改定対象外です。'
+      : '<strong>2026年10月1日</strong> に日本郵便が運賃を改定します。クリックポストは185円→<strong>240円</strong>（2kgまでに拡大）、' +
+        'ゆうパケットは厚さ別料金を廃止して<strong>一律360円</strong>。「適用する料金」を切り替えると新料金で比較できます。';
+    render();
+  });
+
+  $("groups").addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-group]"); if (!b) return;
+    state.group = b.dataset.group;
+    Array.prototype.forEach.call(this.querySelectorAll("button"), function (x) {
+      x.setAttribute("aria-pressed", String(x === b));
+    });
+    render();
+  });
+
+  $("filters").addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-tag]"); if (!b) return;
+    var on = b.getAttribute("aria-pressed") !== "true";
+    b.setAttribute("aria-pressed", String(on));
+    var tag = b.dataset.tag, i = state.tags.indexOf(tag);
+    if (on && i < 0) state.tags.push(tag);
+    if (!on && i >= 0) state.tags.splice(i, 1);
+    render();
+  });
+
+  render();
+})();
+</script>
+<!-- ARTIFACT-BODY-END -->
+</body>
+</html>
