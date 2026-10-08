@@ -1,0 +1,39 @@
+name: Crawl hidden pages
+
+on:
+  push:
+    branches: [claude/hidden-pages-investigation-a2rf9w]
+    paths:
+      - tools/crawl_hidden_pages.py
+      - .github/workflows/crawl_hidden_pages.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Crawl site
+        run: python tools/crawl_hidden_pages.py crawl_report
+
+      - name: Show report
+        if: always()
+        run: cat crawl_report/report.md || true
+
+      - name: Commit report
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add crawl_report
+          git commit -m "巡回レポートを追加 [skip ci]" || exit 0
+          git push origin HEAD:${{ github.ref_name }}
